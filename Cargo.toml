@@ -2,9 +2,23 @@
 name = "rlunch"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
+reqwest = { version = "0.12", features = [
+  "json",
+  "gzip",
+  "brotli",
+  "zstd",
+  "deflate",
+  "stream",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 url = "2.5"
 chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4.2.1", features = ["derive"] }
+anyhow = "1"
+scraper = "0.19"
+lazy_static = "1.5"
