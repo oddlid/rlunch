@@ -1,24 +1,23 @@
 use chrono::{DateTime, Local};
+use compact_str::{CompactString, ToCompactString};
+use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{hash_map::HashMap, hash_set::HashSet},
-    fmt::Display,
-};
+use std::fmt::Display;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Dish {
     /// Name of the dish, e.g. "meatballs"
     #[serde(default)]
-    pub name: String,
+    pub name: CompactString,
     /// More details about the dish, e.g. "with spaghetti"
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<CompactString>,
     // Extra info, e.g. "contains nuts"
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
+    pub comment: Option<CompactString>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: DashSet<String>,
     /// Price, in whatever currency is in use
     #[serde(default)]
     pub price: f32,
@@ -36,29 +35,29 @@ impl Display for Dish {
 impl Dish {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.to_compact_string(),
             ..Default::default()
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Restaurant {
     /// Name of restaurant
     #[serde(default)]
-    pub name: String,
+    pub name: CompactString,
     /// Extra info
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
+    pub comment: Option<CompactString>,
     /// Street address
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address: Option<String>,
+    pub address: Option<CompactString>,
     /// Homepage
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    pub url: Option<CompactString>,
     /// Google maps URL
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub map_url: Option<String>,
+    pub map_url: Option<CompactString>,
     /// When the scraping was last done
     #[serde(default)]
     pub parsed_at: DateTime<Local>,
@@ -70,7 +69,7 @@ pub struct Restaurant {
 impl Restaurant {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.to_compact_string(),
             parsed_at: Local::now(),
             ..Default::default()
         }
@@ -82,23 +81,23 @@ impl Restaurant {
     // }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Site {
     /// Name of site/area
     #[serde(default)]
-    pub name: String,
+    pub name: CompactString,
     /// Extra info
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
+    pub comment: Option<CompactString>,
     /// List of current restaurants
     #[serde(default)]
-    pub restaurants: HashMap<String, Restaurant>,
+    pub restaurants: DashMap<CompactString, Restaurant>,
 }
 
 impl Site {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.to_compact_string(),
             ..Default::default()
         }
     }
@@ -109,20 +108,20 @@ impl Site {
     // }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct City {
     /// Name of city
     #[serde(default)]
-    pub name: String,
+    pub name: CompactString,
     /// List of current sites
     #[serde(default)]
-    pub sites: HashMap<String, Site>,
+    pub sites: DashMap<CompactString, Site>,
 }
 
 impl City {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.to_compact_string(),
             ..Default::default()
         }
     }
@@ -133,23 +132,23 @@ impl City {
     // }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Country {
     /// Name of country
     #[serde(default)]
-    pub name: String,
+    pub name: CompactString,
     /// Currency abbreviation to use as suffix for dish prices
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub currency_suffix: Option<String>,
+    pub currency_suffix: Option<CompactString>,
     /// List of current cities
     #[serde(default)]
-    pub cities: HashMap<String, City>,
+    pub cities: DashMap<CompactString, City>,
 }
 
 impl Country {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.to_compact_string(),
             ..Default::default()
         }
     }
@@ -160,11 +159,11 @@ impl Country {
     // }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LunchData {
     /// List of current countries
     #[serde(default)]
-    pub countries: HashMap<String, Country>,
+    pub countries: DashMap<CompactString, Country>,
 }
 
 impl LunchData {
@@ -186,8 +185,8 @@ mod tests {
     #[test]
     fn dish_display() {
         let d = Dish {
-            name: String::from("meat"),
-            description: Some(String::from("balls")),
+            name: CompactString::from("meat"),
+            description: Some(CompactString::from("balls")),
             ..Default::default()
         };
         assert_eq!("meat balls", format!("{d}"));
@@ -209,7 +208,7 @@ mod tests {
     #[ignore = "Visual inspection"]
     fn show_structure() {
         let mut d = Dish::new("meat");
-        d.description = Some(String::from("balls"));
+        d.description = Some(CompactString::from("balls"));
         d.price = 120.0;
         d.tags.insert(String::from("carnivora"));
         d.tags.insert(String::from("yummy"));
@@ -217,16 +216,16 @@ mod tests {
         let mut r = Restaurant::new("Pasta House");
         r.dishes.push(d);
 
-        let mut s = Site::new("SomeSite");
+        let s = Site::new("SomeSite");
         s.restaurants.insert(r.name.clone(), r);
 
-        let mut city = City::new("Göteborg");
+        let city = City::new("Göteborg");
         city.sites.insert(s.name.clone(), s);
 
-        let mut country = Country::new("Sweden");
+        let country = Country::new("Sweden");
         country.cities.insert(city.name.clone(), city);
 
-        let mut ld = LunchData::new();
+        let ld = LunchData::new();
         ld.countries.insert(country.name.clone(), country);
 
         println!("{}", serde_json::to_string_pretty(&ld).unwrap());

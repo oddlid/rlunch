@@ -37,7 +37,6 @@ async fn main() -> Result<()> {
         .await?;
 
     let doc = Html::parse_document(&res);
-    // let vc = doc.select(&SEL_VIEW_CONTENT).next().unwrap();
     let vc = match doc.select(&SEL_VIEW_CONTENT).next() {
         Some(vc) => vc,
         None => bail!("Invalid HTML"),
@@ -59,15 +58,7 @@ async fn main() -> Result<()> {
     //     .collect::<Vec<_>>();
     // println!("{:#?}", restaurants);
 
-    // let mut site = Site::new("Lindholmen");
-    // This does absolutely not work!
-    // for titles in vc.select(&SEL_TITLE) {
-    //     let restaurant_name = titles.text().next().unwrap_or(UNDEF).trim();
-    //     println!("{restaurant_name}");
-    //     while let Some(s) = titles.next_sibling() {
-    //         println!("{:?}", s.value());
-    //     }
-    // }
+    // let mut dishes: Vec<Dish> = Vec::new();
 
     for e in vc.child_elements() {
         let dish_type = get_text(&e, &SEL_DISH_TYPE);
@@ -90,6 +81,9 @@ fn get_text(e: &ElementRef, sel: &Selector) -> String {
         },
     }
 }
+
+// fn remove_currency_suffix(s: String, suffix: &str) -> String {
+// }
 
 fn reduce_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
