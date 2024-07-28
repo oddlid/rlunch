@@ -3,6 +3,12 @@ name = "rlunch"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+authors = ["Odd E. Ebbesen <oddebb@gmail.com>"]
+description = "A lunch menu scraper and server"
+readme = "README.md"
+publish = false
+homepage = "https://github.com/oddlid/rlunch"
+repository = "https://github.com/oddlid/rlunch"
 
 [dependencies]
 reqwest = { version = "0.12", features = [
