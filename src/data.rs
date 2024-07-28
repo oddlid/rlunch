@@ -74,11 +74,6 @@ impl Restaurant {
             ..Default::default()
         }
     }
-
-    // unsure if I want to have methods like this
-    // pub fn add_dish(&mut self, dish: Dish) {
-    //     self.dishes.push(dish);
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -101,11 +96,6 @@ impl Site {
             ..Default::default()
         }
     }
-
-    // unsure if I want to have methods like this
-    // pub fn add_restaurant(&mut self, restaurant: Restaurant) {
-    //     self.restaurants.insert(restaurant.name.clone(), restaurant);
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -125,11 +115,6 @@ impl City {
             ..Default::default()
         }
     }
-
-    // unsure if I want to have methods like this
-    // pub fn add_site(&mut self, site: Site) {
-    //     self.sites.insert(site.name.clone(), site);
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -152,11 +137,6 @@ impl Country {
             ..Default::default()
         }
     }
-
-    // unsure if I want to have methods like this
-    // pub fn add_city(&mut self, city: City) {
-    //     self.cities.insert(city.name.clone(), city);
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -170,11 +150,6 @@ impl LunchData {
     pub fn new() -> Self {
         Default::default()
     }
-
-    // unsure if I want to have methods like this
-    // pub fn add_country(&mut self, country: Country) {
-    //     self.countries.insert(country.name.clone(), country);
-    // }
 }
 
 #[cfg(test)]
@@ -210,8 +185,8 @@ mod tests {
         let mut d = Dish::new("meat");
         d.description = Some(CompactString::from("balls"));
         d.price = 120.0;
-        d.tags.insert(String::from("carnivora"));
-        d.tags.insert(String::from("yummy"));
+        d.tags.insert(CompactString::from("carnivora"));
+        d.tags.insert(CompactString::from("yummy"));
 
         let mut r = Restaurant::new("Pasta House");
         r.dishes.push(d);
