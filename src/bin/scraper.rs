@@ -1,8 +1,7 @@
 use anyhow::{bail, Result};
 use compact_str::{CompactString, ToCompactString};
 use lazy_static::lazy_static;
-use nom::number::complete;
-use rlunch::data::*;
+use rlunch::{data::*, util::*};
 use scraper::{ElementRef, Html, Selector};
 
 // This is just a test bed for the first attempt at parsing lindholmen.se
@@ -85,27 +84,6 @@ fn parse_dish(e: &ElementRef) -> Option<Dish> {
         dish.tags.insert(t);
     }
     Some(dish)
-}
-
-fn get_text(e: &ElementRef, sel: &Selector) -> Option<CompactString> {
-    match e.select(sel).next() {
-        None => None,
-        Some(v) => v.text().next().map(|v| v.trim().to_compact_string()),
-    }
-}
-
-fn parse_float(s: &str) -> f32 {
-    match complete::float::<_, ()>(s) {
-        Ok((_, v)) => v,
-        _ => 0.0,
-    }
-}
-
-fn reduce_whitespace(s: &str) -> CompactString {
-    s.split_whitespace()
-        .collect::<Vec<&str>>()
-        .join(" ")
-        .to_compact_string()
 }
 
 fn get_dish_name_and_desc(e: &ElementRef) -> (Option<CompactString>, Option<CompactString>) {
