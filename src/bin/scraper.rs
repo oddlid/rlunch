@@ -9,10 +9,6 @@ use scraper::{ElementRef, Html, Selector};
 // Name your user agent after your app?
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
-fn sel(selector: &str) -> Selector {
-    Selector::parse(selector).unwrap()
-}
-
 lazy_static! {
     static ref SEL_VIEW_CONTENT: Selector = sel("div.view-content");
     static ref SEL_DISH: Selector = sel("span.dish-name");
@@ -20,6 +16,8 @@ lazy_static! {
     static ref SEL_DISH_PRICE: Selector = sel("div.table-list__column--price");
 }
 
+// there's currently no benefit to having the async stuff in here,
+// but I just want to get used to this way of coding
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = reqwest::Client::builder()

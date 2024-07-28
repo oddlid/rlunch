@@ -2,6 +2,10 @@ use compact_str::{CompactString, ToCompactString};
 use nom::number::complete;
 use scraper::{ElementRef, Selector};
 
+pub fn sel(selector: &str) -> Selector {
+    Selector::parse(selector).unwrap()
+}
+
 pub fn get_text(e: &ElementRef, sel: &Selector) -> Option<CompactString> {
     match e.select(sel).next() {
         None => None,
