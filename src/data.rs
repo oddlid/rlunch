@@ -17,7 +17,7 @@ pub struct Dish {
     pub comment: Option<CompactString>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
     #[serde(default)]
-    pub tags: DashSet<String>,
+    pub tags: DashSet<CompactString>,
     /// Price, in whatever currency is in use
     #[serde(default)]
     pub price: f32,

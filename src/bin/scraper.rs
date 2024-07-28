@@ -1,5 +1,7 @@
 use anyhow::{bail, Result};
+use compact_str::{CompactString, ToCompactString};
 use lazy_static::lazy_static;
+use nom::number::complete;
 use rlunch::data::*;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
@@ -7,7 +9,7 @@ use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
 // Name your user agent after your app?
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
-const UNDEF: &str = "UNDEFINED";
+// const UNDEF: &str = "UNDEFINED";
 
 fn sel(selector: &str) -> Selector {
     Selector::parse(selector).unwrap()
@@ -16,6 +18,7 @@ fn sel(selector: &str) -> Selector {
 lazy_static! {
     static ref SEL_VIEW_CONTENT: Selector = sel("div.view-content");
     static ref SEL_CONTENT: Selector = sel("div.content");
+    static ref SEL_VIEW_LUNCH: Selector = sel("div.view-id-dagens_lunch");
     static ref SEL_TITLE: Selector = sel("h3.title");
     static ref SEL_DISH_ROW: Selector = sel("div.table-list__row");
     static ref SEL_DISH: Selector = sel("span.dish-name");
@@ -41,6 +44,22 @@ async fn main() -> Result<()> {
         Some(vc) => vc,
         None => bail!("Invalid HTML"),
     };
+
+    for e in vc.child_elements() {
+        match e.attr("class") {
+            None => continue,
+            Some(v) => {
+                if v == "title" {
+                    if let Some(name) = e.text().next().map(|v| v.trim().to_compact_string()) {
+                        println!("Restaurant: {}", name);
+                    }
+                } else if let Some(d) = parse_dish(&e) {
+                    println!("{d:?}")
+                }
+            }
+        }
+    }
+
     // for restaurant_block in vc.select(&SEL_TITLE) {
     //     let name = restaurant_block
     //         .text()
@@ -60,55 +79,99 @@ async fn main() -> Result<()> {
 
     // let mut dishes: Vec<Dish> = Vec::new();
 
-    for e in vc.child_elements() {
-        let dish_type = get_text(&e, &SEL_DISH_TYPE);
-        let (dish_name, dish_desc) = get_dish_name_and_desc(&e);
-        let dish_price = get_text(&e, &SEL_DISH_PRICE);
-        println!(
-            "=> Dish:\nType: {dish_type}\nName: {dish_name}\nDesc: {dish_desc}\nPrice: {dish_price}\n\n"
-        );
-    }
+    // if let Some(s) = doc.select(&sel("h3.title ~ div.table-list__row")).next() {
+    //     println!("{:?}", s.value());
+    // }
+    // for e in doc.select(&sel("h3.title ~ :not(h3.title)")) {
+    //     println!("{:?}", e.value());
+    // }
+
+    // for r in doc.select(&sel("h3.title")) {
+    //     println!("{:?}", r.value());
+    //     for d in r.select(&sel("div.table-list__row ~ :not(h3.title)")) {
+    //         println!("{:?}", d.value());
+    //     }
+    // }
 
     Ok(())
 }
 
-fn get_text(e: &ElementRef, sel: &Selector) -> String {
+fn parse_dish(e: &ElementRef) -> Option<Dish> {
+    let (name, description) = get_dish_name_and_desc(e);
+    let price = match get_text(e, &SEL_DISH_PRICE) {
+        None => 0.0,
+        Some(v) => parse_float(v.trim()),
+    };
+    let dish = Dish {
+        name: name?,
+        description,
+        price,
+        ..Default::default()
+    };
+    if let Some(t) = get_text(e, &SEL_DISH_TYPE) {
+        dish.tags.insert(t);
+    }
+    Some(dish)
+}
+
+fn get_text(e: &ElementRef, sel: &Selector) -> Option<CompactString> {
     match e.select(sel).next() {
-        None => UNDEF.to_owned(),
-        Some(v) => match v.text().next() {
-            None => UNDEF.to_owned(),
-            Some(v) => v.trim().to_owned(),
-        },
+        None => None,
+        Some(v) => v.text().next().map(|v| v.trim().to_compact_string()),
     }
 }
 
-// fn remove_currency_suffix(s: String, suffix: &str) -> String {
-// }
-
-fn reduce_whitespace(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    s.split_whitespace().for_each(|w| {
-        if !result.is_empty() {
-            result.push(' ');
-        }
-        result.push_str(w);
-    });
-    result
+fn parse_float(s: &str) -> f32 {
+    match complete::float::<_, ()>(s) {
+        Ok((_, v)) => v,
+        _ => 0.0,
+    }
 }
 
-fn get_dish_name_and_desc(e: &ElementRef) -> (String, String) {
+fn reduce_whitespace(s: &str) -> CompactString {
+    s.split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" ")
+        .to_compact_string()
+}
+
+fn get_dish_name_and_desc(e: &ElementRef) -> (Option<CompactString>, Option<CompactString>) {
+    // match e.select(&SEL_DISH).next() {
+    //     None => (UNDEF.to_compact_string(), UNDEF.to_compact_string()),
+    //     Some(v) => {
+    //         let mut t = v.text();
+    //         let name = match t.next() {
+    //             None => UNDEF.to_compact_string(),
+    //             Some(v) => v.trim().to_compact_string(),
+    //         };
+    //         let desc = match t.next() {
+    //             None => UNDEF.to_compact_string(),
+    //             Some(v) => reduce_whitespace(v),
+    //         };
+    //         (name, desc)
+    //     }
+    // }
+    // match e.select(&SEL_DISH).next() {
+    //     None => (None, None),
+    //     Some(v) => {
+    //         let mut t = v.text();
+    //         let name = match t.next() {
+    //             None => None,
+    //             Some(v) => Some(v.trim().to_compact_string()),
+    //         };
+    //         let desc = match t.next() {
+    //             None => None,
+    //             Some(v) => Some(reduce_whitespace(v)),
+    //         };
+    //         (name, desc)
+    //     }
+    // }
     match e.select(&SEL_DISH).next() {
-        None => (UNDEF.to_owned(), UNDEF.to_owned()),
+        None => (None, None),
         Some(v) => {
             let mut t = v.text();
-            let name = match t.next() {
-                None => UNDEF.to_owned(),
-                Some(v) => v.trim().to_owned(),
-            };
-            let desc = match t.next() {
-                None => UNDEF.to_owned(),
-                Some(v) => reduce_whitespace(v),
-            };
+            let name = t.next().map(|v| v.trim().to_compact_string());
+            let desc = t.next().map(reduce_whitespace);
             (name, desc)
         }
     }

@@ -24,3 +24,4 @@ scraper = "0.19"
 lazy_static = "1.5"
 compact_str = { version = "0.8", features = ["serde", "markup"] }
 dashmap = { version = "6.0", features = ["serde", "inline"] }
+nom = { version = "7.1" }
