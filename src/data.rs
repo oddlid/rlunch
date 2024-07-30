@@ -1,10 +1,10 @@
 use chrono::{DateTime, Local};
 use compact_str::{CompactString, ToCompactString};
-use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{hash_map::HashMap, hash_set::HashSet};
 use std::fmt::Display;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Dish {
     /// Name of the dish, e.g. "meatballs"
     #[serde(default)]
@@ -17,7 +17,7 @@ pub struct Dish {
     pub comment: Option<CompactString>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
     #[serde(default)]
-    pub tags: DashSet<CompactString>,
+    pub tags: HashSet<CompactString>,
     /// Price, in whatever currency is in use
     #[serde(default)]
     pub price: f32,
@@ -41,7 +41,7 @@ impl Dish {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Restaurant {
     /// Name of restaurant
     #[serde(default)]
@@ -76,7 +76,7 @@ impl Restaurant {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Site {
     /// Name of site/area
     #[serde(default)]
@@ -86,7 +86,7 @@ pub struct Site {
     pub comment: Option<CompactString>,
     /// List of current restaurants
     #[serde(default)]
-    pub restaurants: DashMap<CompactString, Restaurant>,
+    pub restaurants: HashMap<CompactString, Restaurant>,
 }
 
 impl Site {
@@ -98,14 +98,14 @@ impl Site {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct City {
     /// Name of city
     #[serde(default)]
     pub name: CompactString,
     /// List of current sites
     #[serde(default)]
-    pub sites: DashMap<CompactString, Site>,
+    pub sites: HashMap<CompactString, Site>,
 }
 
 impl City {
@@ -117,7 +117,7 @@ impl City {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Country {
     /// Name of country
     #[serde(default)]
@@ -127,7 +127,7 @@ pub struct Country {
     pub currency_suffix: Option<CompactString>,
     /// List of current cities
     #[serde(default)]
-    pub cities: DashMap<CompactString, City>,
+    pub cities: HashMap<CompactString, City>,
 }
 
 impl Country {
@@ -139,11 +139,11 @@ impl Country {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct LunchData {
     /// List of current countries
     #[serde(default)]
-    pub countries: DashMap<CompactString, Country>,
+    pub countries: HashMap<CompactString, Country>,
 }
 
 impl LunchData {
@@ -191,16 +191,16 @@ mod tests {
         let mut r = Restaurant::new("Pasta House");
         r.dishes.push(d);
 
-        let s = Site::new("SomeSite");
+        let mut s = Site::new("SomeSite");
         s.restaurants.insert(r.name.clone(), r);
 
-        let city = City::new("Göteborg");
+        let mut city = City::new("Göteborg");
         city.sites.insert(s.name.clone(), s);
 
-        let country = Country::new("Sweden");
+        let mut country = Country::new("Sweden");
         country.cities.insert(city.name.clone(), city);
 
-        let ld = LunchData::new();
+        let mut ld = LunchData::new();
         ld.countries.insert(country.name.clone(), country);
 
         println!("{}", serde_json::to_string_pretty(&ld).unwrap());

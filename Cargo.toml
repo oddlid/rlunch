@@ -24,10 +24,18 @@ serde_json = "1.0"
 url = "2.5"
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }
+tokio-cron-scheduler = { version = "*", features = ["log", "signal"] }
 clap = { version = "4.2.1", features = ["derive"] }
+clap-verbosity-flag = "2.2"
 anyhow = "1"
 scraper = "0.19"
 lazy_static = "1.5"
 compact_str = { version = "0.8", features = ["serde", "markup"] }
-dashmap = { version = "6.0", features = ["serde", "inline"] }
 nom = { version = "7.1" }
+# dashmap = { version = "6.0", features = ["serde", "inline"] }
+
+# Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release
+# [profile.release]
+# strip = true
+# lto = true
+# codegen-units = 1

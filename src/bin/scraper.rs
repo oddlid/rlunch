@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
         None => bail!("Invalid HTML"),
     };
 
-    let site = Site::new("Lindholmen");
+    let mut site = Site::new("Lindholmen");
     let mut cur_restaurant_name = CompactString::new("");
 
     for e in vc.child_elements() {
@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
                     if cur_restaurant_name.is_empty() {
                         continue;
                     }
-                    let mut r = site
+                    let r = site
                         .restaurants
                         .entry(cur_restaurant_name.clone())
                         .or_insert_with(|| Restaurant::new(&cur_restaurant_name));
@@ -72,7 +72,7 @@ fn parse_dish(e: &ElementRef) -> Option<Dish> {
         None => 0.0,
         Some(v) => parse_float(v.trim()),
     };
-    let dish = Dish {
+    let mut dish = Dish {
         name: name?,
         description,
         price,
