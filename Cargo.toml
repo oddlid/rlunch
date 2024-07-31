@@ -32,6 +32,18 @@ scraper = "0.19"
 lazy_static = "1.5"
 compact_str = { version = "0.8", features = ["serde", "markup"] }
 nom = { version = "7.1" }
+log = { version = "0.4" }
+tracing = { version = "0.1", default-features = false, features = [
+  "attributes",
+  "std",
+] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+  "env-filter",
+  "json",
+  "std",
+  "fmt",
+  "ansi",
+] }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
 
 # Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release

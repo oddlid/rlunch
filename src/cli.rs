@@ -1,19 +1,20 @@
 use anyhow::{Error, Result};
 use clap::{Parser, Subcommand};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clap_verbosity_flag::{ErrorLevel, LevelFilter, Verbosity};
 use compact_str::{CompactString, ToCompactString};
-use tokio::io::AsyncWriteExt as _;
+use tracing::{debug, instrument};
+use tracing_subscriber::filter::LevelFilter as TFilter;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     /// Log level verbosity
     #[command(flatten)]
-    verbosity: Verbosity<InfoLevel>,
+    pub verbosity: Verbosity<ErrorLevel>,
 
     /// Subcommand to run
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
@@ -42,20 +43,29 @@ impl Cli {
         Self::try_parse_from(itr).map_err(Error::from)
     }
 
-    // might not use this in the end, but keeping it for signature reference, for now
-    pub async fn run<W>(self, w: &mut W) -> Result<()>
-    where
-        W: tokio::io::AsyncWrite,
-        W: std::marker::Unpin,
-    {
-        w.write_all(b"Cli::run was called\n").await?;
+    /// Maps clap_verbosity_flag::LevelFilter values to tracing_subscriber::filter::LevelFilter
+    /// values
+    pub fn tracing_level_filter(&self) -> TFilter {
+        match self.verbosity.log_level_filter() {
+            LevelFilter::Off => TFilter::OFF,
+            LevelFilter::Error => TFilter::ERROR,
+            LevelFilter::Warn => TFilter::WARN,
+            LevelFilter::Info => TFilter::INFO,
+            LevelFilter::Debug => TFilter::DEBUG,
+            LevelFilter::Trace => TFilter::TRACE,
+        }
+    }
 
+    // might not use this in the end, but keeping it for signature reference, for now
+    #[instrument]
+    pub async fn run(self) -> Result<()> {
         match self.command {
             Commands::Scrape {} => {}
             Commands::Serve { listen, cron } => {
                 let cron = cron.unwrap_or("UNDEF".to_compact_string());
-                let msg = format!("Listening on {} witch schedule {}\n", listen, cron);
-                w.write_all(msg.as_bytes()).await?;
+                // let msg = format!("Listening on {} with schedule {}\n", listen, cron);
+                // w.write_all(msg.as_bytes()).await?;
+                debug!("Listening on {} with cron schedule: {}", listen, cron);
             }
         }
         Ok(())
@@ -70,6 +80,6 @@ mod tests {
     async fn parse_and_run() {
         let cli =
             Cli::parse_opts(["test", "-v", "serve", "--listen", ":1234", "--cron", "* *"]).unwrap();
-        cli.run(&mut tokio::io::stdout()).await.unwrap();
+        cli.run().await.unwrap();
     }
 }
