@@ -1,9 +1,18 @@
 use anyhow::{Error, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{ErrorLevel, LevelFilter, Verbosity};
 use compact_str::{CompactString, ToCompactString};
 use tracing::{debug, instrument};
 use tracing_subscriber::filter::LevelFilter as TFilter;
+
+#[derive(Debug, Clone, Default, ValueEnum)]
+pub enum LogFormat {
+    Normal,
+    Compact,
+    Pretty,
+    #[default]
+    Json,
+}
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -11,6 +20,10 @@ pub struct Cli {
     /// Log level verbosity
     #[command(flatten)]
     pub verbosity: Verbosity<ErrorLevel>,
+
+    /// Which log formatter to use
+    #[arg(short = 'f', long, default_value_t, value_enum)]
+    pub log_format: LogFormat,
 
     /// Subcommand to run
     #[command(subcommand)]
