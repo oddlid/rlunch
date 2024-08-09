@@ -1,8 +1,9 @@
 use anyhow::Result;
-use rlunch::cli;
+use rlunch::{cli, signals};
 use std::io;
-use tokio::{select, sync::broadcast};
-use tracing::{debug, error, info, trace, warn};
+use tokio::sync::broadcast;
+use tokio_cron_scheduler::{Job, JobScheduler};
+use tracing::{error, trace, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 #[derive(Debug, Clone)]
@@ -18,60 +19,95 @@ async fn main() -> Result<()> {
     let cli = cli::Cli::parse_opts(std::env::args_os())?;
     init_logger(&cli)?;
 
-    let (tx, mut rx1) = broadcast::channel(16);
-    let mut rx2 = tx.subscribe();
+    match &cli.command {
+        cli::Commands::Scrape {} => error!("One-shot scrape not yet implemented"),
+        cli::Commands::Serve { listen, cron } => match cron {
+            Some(c) => {
+                trace!("Listening on: {}", listen);
+                let mut sig = signals::listen().await?;
+                setup_scrapers(c.as_str(), &mut sig).await?;
+            }
+            None => {
+                error!("Start without schedule not yet supported");
+            }
+        },
+    }
 
-    let mut hnds = vec![
-        tokio::spawn(async move {
-            loop {
-                match rx2.recv().await {
-                    Ok(cmd) => match cmd {
-                        ScrapeCmd::Run => {
-                            trace!("ScraperOne running scrape");
-                        }
-                        ScrapeCmd::Stop => {
-                            trace!("ScraperOne stopping due to stop command");
-                            break;
-                        }
-                    },
-                    Err(e) => {
-                        trace!("ScraperOne stopping due to error: {:?}", e);
-                        break;
-                    }
-                }
-            }
-        }),
-        tokio::spawn(async move {
-            loop {
-                match rx1.recv().await {
-                    Ok(cmd) => match cmd {
-                        ScrapeCmd::Run => {
-                            trace!("ScraperTwo running scrape");
-                        }
-                        ScrapeCmd::Stop => {
-                            trace!("ScraperTwo stopping due to stop command");
-                            break;
-                        }
-                    },
-                    Err(e) => {
-                        trace!("ScraperTwo stopping due to error: {:?}", e);
-                        break;
-                    }
-                }
-            }
-        }),
+    trace!("Main done");
+
+    Ok(())
+}
+
+#[tracing::instrument]
+async fn scrape_once() {
+    warn!("One-off scraping not yet implemented")
+}
+
+#[tracing::instrument]
+async fn setup_scrapers(
+    schedule: &str,
+    signals: &mut broadcast::Receiver<signals::Signal>,
+) -> Result<()> {
+    let (tx, rx) = broadcast::channel(2);
+    drop(rx);
+    let tx_run = tx.clone();
+    let mut sched = JobScheduler::new().await?;
+    let job = Job::new(schedule, move |uuid, _lock| {
+        trace!("{}: Notifying all scrapers to run", uuid);
+        tx_run.send(ScrapeCmd::Run).unwrap();
+    })?;
+    sched.add(job).await?;
+
+    let mut handles = vec![
+        tokio::spawn(run_scraper("S1", tx.subscribe())),
+        tokio::spawn(run_scraper("S2", tx.subscribe())),
     ];
 
-    tx.send(ScrapeCmd::Run).unwrap();
-    tx.send(ScrapeCmd::Stop).unwrap();
+    sched.start().await?;
 
-    for hnd in hnds.drain(..) {
-        hnd.await.unwrap();
+    tokio::select! {
+        sig = signals.recv() => match sig {
+            Ok(s) => {
+                trace!("Got signal: {:?}", s);
+                sched.shutdown().await?;
+                tx.send(ScrapeCmd::Stop)?;
+            },
+            Err(e) => {
+                error!("Signal error: {}", e);
+                sched.shutdown().await?;
+                tx.send(ScrapeCmd::Stop)?;
+            }
+        }
+    }
+
+    for hnd in handles.drain(..) {
+        hnd.await?;
     }
 
     Ok(())
 }
 
+#[tracing::instrument]
+async fn run_scraper(name: &'static str, mut cmds: broadcast::Receiver<ScrapeCmd>) {
+    loop {
+        let cmd = cmds.recv().await;
+        match cmd {
+            Ok(cmd) => match cmd {
+                ScrapeCmd::Stop => {
+                    trace!("{} stopping due to stop command", name);
+                    break;
+                }
+                ScrapeCmd::Run => trace!("{} running scraper", name),
+            },
+            Err(e) => {
+                trace!("{} stopping due to error: {:?}", name, e);
+                break;
+            }
+        }
+    }
+}
+
+#[tracing::instrument]
 fn init_logger(cli: &cli::Cli) -> Result<()> {
     let layer = match cli.log_format {
         cli::LogFormat::Json => fmt::layer().json().with_writer(io::stderr).boxed(),
@@ -93,54 +129,3 @@ fn init_logger(cli: &cli::Cli) -> Result<()> {
         .init();
     Ok(())
 }
-
-// async fn run_scraper(
-//     name: &'static str,
-//     mut cmds: broadcast::Receiver<ScrapeCmd>,
-// ) -> tokio::task::JoinHandle<()> {
-//     tokio::spawn(async move {
-//         loop {
-//             let cmd = cmds.recv().await;
-//             match cmd {
-//                 Ok(cmd) => match cmd {
-//                     ScrapeCmd::Stop => {
-//                         trace!("{} stopping due to stop command", name);
-//                         break;
-//                     }
-//                     ScrapeCmd::Run => trace!("{} running scraper", name),
-//                 },
-//                 Err(e) => {
-//                     trace!("{} stopping due to error: {:?}", name, e);
-//                     break;
-//                 }
-//             }
-//         }
-//     })
-// }
-
-// #[tracing::instrument]
-// async fn test_logging() {
-//     // let span = span!(Level::TRACE, "test_span");
-//     // let _guard = span.enter();
-//
-//     // these are no longer duplicated after removing default-features from
-//     // the tracing and tracing-subscriber crates, and only enabling what I want
-//     trace!("Tracing at TRACE level");
-//     debug!("Tracing at DEBUG level");
-//     info!("Tracing at INFO level");
-//     warn!("Tracing at WARN level");
-//     error!("Tracing at ERROR level");
-//
-//     // these do nothing with the changes mentioned above
-//     log::trace!("Log at TRACE level");
-//     log::debug!("Log at DEBUG level");
-//     log::info!("Log at INFO level");
-//     log::warn!("Log at WARN level");
-//     log::error!("Log at ERROR level");
-//
-//     // event!(Level::TRACE, "Event log at TRACE level");
-//     // event!(Level::DEBUG, "Event log at DEBUG level");
-//     // event!(Level::INFO, "Event log at INFO level");
-//     // event!(Level::WARN, "Event log at WARN level");
-//     // event!(Level::ERROR, "Event log at ERROR level");
-// }

@@ -83,6 +83,10 @@ impl Cli {
         }
         Ok(())
     }
+
+    // pub fn schedule<T>(&self, run: T) -> Result<Job, JobSchedulerError> {
+    //     Job::new(self.cron)
+    // }
 }
 
 #[cfg(test)]
