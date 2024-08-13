@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rlunch::{cli, signals};
-use std::io;
+use std::{io, time::Duration};
 use tokio::sync::broadcast;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, trace, warn};
@@ -12,27 +12,40 @@ enum ScrapeCmd {
     Stop,
 }
 
-// might need to switch out tokio::main for some other variant from whatever web framework I end up
-// using
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse_opts(std::env::args_os())?;
     init_logger(&cli)?;
 
+    let mut tasks = vec![];
+    let mut sig = signals::listen().await?;
+
     match &cli.command {
-        cli::Commands::Scrape {} => error!("One-shot scrape not yet implemented"),
+        cli::Commands::Scrape {} => scrape_once().await,
         cli::Commands::Serve { listen, cron } => match cron {
             Some(c) => {
                 trace!("Listening on: {}", listen);
-                let mut sig = signals::listen().await?;
-                setup_scrapers(c.as_str(), &mut sig).await?;
+                let schedule = c.clone();
+                tasks.push(tokio::spawn(async move {
+                    setup_scrapers(schedule.as_str(), &mut sig).await
+                }));
             }
             None => {
-                error!("Start without schedule not yet supported");
+                error!("Serve without schedule not yet supported");
             }
         },
     }
 
+    let sleep_duration = Duration::from_secs(10);
+    trace!("Sleeping for {:?}...", sleep_duration);
+    tokio::time::sleep(sleep_duration).await;
+
+    trace!("Stopping tasks...");
+    for h in tasks.drain(..) {
+        if let Err(e) = h.await? {
+            error!("Sub task failed: {:?}", e);
+        }
+    }
     trace!("Main done");
 
     Ok(())
@@ -51,18 +64,22 @@ async fn setup_scrapers(
     let (tx, rx) = broadcast::channel(2);
     drop(rx);
     let tx_run = tx.clone();
+    trace!("Creating scheduler...");
     let mut sched = JobScheduler::new().await?;
-    let job = Job::new(schedule, move |uuid, _lock| {
-        trace!("{}: Notifying all scrapers to run", uuid);
+    trace!("Creating job...");
+    let job = Job::new(schedule, move |uid, _lock| {
+        trace!(id = uid.to_string(), "Notifying all scrapers to run");
         tx_run.send(ScrapeCmd::Run).unwrap();
     })?;
+    trace!("Adding job...");
     sched.add(job).await?;
 
-    let mut handles = vec![
+    let mut tasks = vec![
         tokio::spawn(run_scraper("S1", tx.subscribe())),
         tokio::spawn(run_scraper("S2", tx.subscribe())),
     ];
 
+    trace!("Starting scheduler...");
     sched.start().await?;
 
     tokio::select! {
@@ -80,7 +97,7 @@ async fn setup_scrapers(
         }
     }
 
-    for hnd in handles.drain(..) {
+    for hnd in tasks.drain(..) {
         hnd.await?;
     }
 
