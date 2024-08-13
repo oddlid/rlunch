@@ -4,22 +4,45 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::HashMap, hash_set::HashSet};
 use std::fmt::Display;
 
+// I'm evaluating if I should move away from having all these nested structs, and rather have them
+// decoupled, or at least from `Site` and upwards.
+// My original idea was to implement this in the same way as the original `go2lunch`, where there's
+// a set of threads responsible for scraping and updating the global data structure, while other threads
+// take care of the http serving. That worked well enough in the original, with a quite small data
+// set, but I think this would become problematic if we're to actually expand into many more sites,
+// cities, and countries.
+//
+// A better approcah could be to have all data in some DB, and to have wrapper structs that
+// contains the necessary references / IDs, to be able to resolve where in the hierarchy the item
+// belongs.
+// I should then separate the logic of serving, from scraping and updating.
+// There are several ways this could be done:
+// - We could have an http server that only serves GET requests
+//   * Scraping is done in a separate binary, directly updating the same DB, either with each
+//     scraper directly updating the DB, or via a central manager thread receiving scrape results
+//     and updating the DB from the results
+// - We could have an http server that accepts GET/POST/DELETE etc to update the DB from external
+//   scrape results. This would require authentication.
+//   * Separate scraper binary/(ies) that post results to the http server. Most flexible, since
+//     scrapers could be run anywhere and written in any language.
+// - A combination/variant of the above, where serving GET is separate, and we have some sort of
+//   manager responsible for receiving results and updating the DB. Could be with authentication,
+//   or without, if all scrapers are local and trusted.
+//
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct Dish {
     /// Name of the dish, e.g. "meatballs"
-    #[serde(default)]
     pub name: CompactString,
     /// More details about the dish, e.g. "with spaghetti"
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<CompactString>,
     // Extra info, e.g. "contains nuts"
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<CompactString>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
-    #[serde(default)]
     pub tags: HashSet<CompactString>,
     /// Price, in whatever currency is in use
-    #[serde(default)]
     pub price: f32,
 }
 
@@ -42,27 +65,25 @@ impl Dish {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct Restaurant {
     /// Name of restaurant
-    #[serde(default)]
     pub name: CompactString,
     /// Extra info
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<CompactString>,
     /// Street address
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<CompactString>,
     /// Homepage
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<CompactString>,
     /// Google maps URL
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub map_url: Option<CompactString>,
     /// When the scraping was last done
-    #[serde(default)]
     pub parsed_at: DateTime<Local>,
     /// List of current dishes
-    #[serde(default)]
     pub dishes: Vec<Dish>,
 }
 
@@ -77,15 +98,14 @@ impl Restaurant {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct Site {
     /// Name of site/area
-    #[serde(default)]
     pub name: CompactString,
     /// Extra info
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<CompactString>,
     /// List of current restaurants
-    #[serde(default)]
     pub restaurants: HashMap<CompactString, Restaurant>,
 }
 
@@ -99,12 +119,11 @@ impl Site {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct City {
     /// Name of city
-    #[serde(default)]
     pub name: CompactString,
     /// List of current sites
-    #[serde(default)]
     pub sites: HashMap<CompactString, Site>,
 }
 
@@ -118,15 +137,14 @@ impl City {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct Country {
     /// Name of country
-    #[serde(default)]
     pub name: CompactString,
     /// Currency abbreviation to use as suffix for dish prices
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub currency_suffix: Option<CompactString>,
     /// List of current cities
-    #[serde(default)]
     pub cities: HashMap<CompactString, City>,
 }
 
@@ -140,9 +158,9 @@ impl Country {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
 pub struct LunchData {
     /// List of current countries
-    #[serde(default)]
     pub countries: HashMap<CompactString, Country>,
 }
 
