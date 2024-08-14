@@ -11,6 +11,7 @@ pub enum Signal {
     Usr2,
 }
 
+// TODO: rework this to be more like: https://github.com/davidpdrsn/realworld-axum-sqlx/blob/main/src/http/mod.rs
 pub async fn listen() -> Result<broadcast::Receiver<Signal>> {
     let (tx, rx) = broadcast::channel(6);
 

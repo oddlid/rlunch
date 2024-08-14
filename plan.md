@@ -43,3 +43,7 @@ to the solution above, I think I'll do something like the following:
     result, before inserting its dishes. This might be poor practice
     from a DB efficiency point of view, but DB performance is not the
     priority at this point of the project.
+
+Actually, when mentioning separate binaries above, it can still all
+be in a single binary, with different modes triggered via subcommands,
+like git.
