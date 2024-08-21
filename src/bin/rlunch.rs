@@ -1,16 +1,7 @@
 use anyhow::Result;
 use compact_str::CompactString;
-use rlunch::cli;
+use rlunch::{cli, scrape};
 use tracing::{trace, warn};
-// use std::time::Duration;
-// use tokio::sync::broadcast;
-// use tokio_cron_scheduler::{Job, JobScheduler};
-
-// #[derive(Debug, Clone)]
-// enum ScrapeCmd {
-//     Run,
-//     Stop,
-// }
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,37 +9,7 @@ async fn main() -> Result<()> {
     c.init_logger()?;
 
     // just for testing log output during development
-    cli::test_tracing();
-
-    // let mut tasks = vec![];
-    // let mut sig = signals::listen().await?;
-    //
-    // match &cli.command {
-    //     cli::Commands::Scrape {} => scrape_once().await,
-    //     cli::Commands::Serve { listen, cron } => match cron {
-    //         Some(c) => {
-    //             trace!("Listening on: {}", listen);
-    //             let schedule = c.clone();
-    //             tasks.push(tokio::spawn(async move {
-    //                 setup_scrapers(schedule.as_str(), &mut sig).await
-    //             }));
-    //         }
-    //         None => {
-    //             error!("Serve without schedule not yet supported");
-    //         }
-    //     },
-    // }
-    //
-    // let sleep_duration = Duration::from_secs(10);
-    // trace!("Sleeping for {:?}...", sleep_duration);
-    // tokio::time::sleep(sleep_duration).await;
-    //
-    // trace!("Stopping tasks...");
-    // for h in tasks.drain(..) {
-    //     if let Err(e) = h.await? {
-    //         error!("Sub task failed: {:?}", e);
-    //     }
-    // }
+    // cli::test_tracing();
 
     dispatch_commands(c).await?;
 
@@ -61,7 +22,7 @@ async fn main() -> Result<()> {
 async fn dispatch_commands(c: cli::Cli) -> Result<()> {
     trace!("Checking args and running desired subcommand");
     match c.command {
-        cli::Commands::Scrape { cron } => run_scrapers(cron).await?,
+        cli::Commands::Scrape { cron } => scrape::run(cron).await?,
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(listen).await?,
             cli::ServeCommands::Admin => run_server_admin(listen).await?,
@@ -70,17 +31,6 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
             }
         },
     }
-    Ok(())
-}
-
-// #[tracing::instrument]
-async fn run_scrapers(schedule: Option<CompactString>) -> Result<()> {
-    if let Some(v) = schedule {
-        trace!("Running scrapers on schedule: {v}");
-    } else {
-        trace!("No schedule given, running one-off scrape");
-    }
-    warn!("TODO: Actually start scrapers");
     Ok(())
 }
 
@@ -101,11 +51,6 @@ async fn run_server_html(addr: CompactString, backend_addr: CompactString) -> Re
     warn!("TODO: Actually start HTML server on addr: {addr}, with backend on: {backend_addr}");
     Ok(())
 }
-
-// #[tracing::instrument]
-// async fn scrape_once() {
-//     warn!("One-off scraping not yet implemented")
-// }
 
 // #[tracing::instrument]
 // async fn setup_scrapers(

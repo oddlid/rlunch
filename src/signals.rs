@@ -1,56 +1,68 @@
 use anyhow::Result;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::{
+    self,
+    unix::{signal, SignalKind},
+};
 use tokio::sync::broadcast;
 
-// This could be a lot more generic and flexible, but will do for now
-
-#[derive(Clone, Debug)]
-pub enum Signal {
-    Shutdown,
-    Usr1,
-    Usr2,
-}
-
-// TODO: rework this to be more like: https://github.com/davidpdrsn/realworld-axum-sqlx/blob/main/src/http/mod.rs
-pub async fn listen() -> Result<broadcast::Receiver<Signal>> {
-    let (tx, rx) = broadcast::channel(6);
-
-    let mut int = signal(SignalKind::interrupt())?;
-    let mut term = signal(SignalKind::terminate())?;
-    let mut hup = signal(SignalKind::hangup())?;
-    let mut quit = signal(SignalKind::quit())?;
-    let mut usr1 = signal(SignalKind::user_defined1())?;
-    let mut usr2 = signal(SignalKind::user_defined2())?;
+pub async fn shutdown_channel() -> Result<broadcast::Receiver<()>> {
+    let (tx, rx) = broadcast::channel(4);
 
     tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = int.recv() => {
-                    tx.send(Signal::Shutdown).unwrap();
-                    break;
-                },
-                _ = term.recv() => {
-                    tx.send(Signal::Shutdown).unwrap();
-                    break;
-                },
-                _ = hup.recv() => {
-                    tx.send(Signal::Shutdown).unwrap();
-                    break;
-                },
-                _ = quit.recv() => {
-                    tx.send(Signal::Shutdown).unwrap();
-                    break;
-                },
-                _ = usr1.recv() => {
-                    tx.send(Signal::Usr1).unwrap();
-                    continue;
-                },
-                _ = usr2.recv() => {
-                    tx.send(Signal::Usr2).unwrap();
-                    continue;
-                },
-            }
-        }
+        shutdown_signal().await;
+        tx.send(())
+            .expect("Failed to send shutdown signal on channel")
     });
+
     Ok(rx)
+}
+
+// based on:
+// https://github.com/davidpdrsn/realworld-axum-sqlx/blob/main/src/http/mod.rs
+pub async fn shutdown_signal() {
+    let sig_int = async {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to register SIGINT handler");
+    };
+
+    #[cfg(unix)]
+    let sig_term = async {
+        signal(SignalKind::terminate())
+            .expect("Failed to register SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let sig_term = std::future::pending::<()>();
+
+    #[cfg(unix)]
+    let sig_quit = async {
+        signal(SignalKind::quit())
+            .expect("Failed to register SIGQUIT handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let sig_quit = std::future::pending::<()>();
+
+    #[cfg(unix)]
+    let sig_hup = async {
+        signal(SignalKind::hangup())
+            .expect("Failed to register SIGHUP handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let sig_hup = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = sig_int => {},
+        _ = sig_term => {},
+        _ = sig_quit => {},
+        _ = sig_hup => {},
+    }
 }
