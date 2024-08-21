@@ -32,8 +32,8 @@ enum ScrapeCommand {
 
 pub async fn run(schedule: Option<CompactString>) -> Result<()> {
     let shutdown = crate::signals::shutdown_channel().await?;
-    let (cmd_tx, _) = broadcast::channel(16);
-    let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(100);
+    let (cmd_tx, _) = broadcast::channel(8); // don't know optimal buffer size yet
+    let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(100); // same here
     match start_scheduler(schedule, cmd_tx.clone()).await {
         Ok(sched) => run_loop(sched, shutdown, cmd_tx, res_tx, res_rx).await,
         Err(e) => {
@@ -144,7 +144,7 @@ async fn setup_scrapers(
 ) -> task::JoinSet<()> {
     let mut set = task::JoinSet::new();
     set.spawn(run_scraper(
-        scrapers::se::gbg::lh::LHScraper::default(),
+        scrapers::se::gbg::lh::LHScraper::new(),
         cmds.subscribe(),
         results.clone(),
     ));
@@ -156,7 +156,7 @@ async fn stop_scrapers(
     mut tasks: task::JoinSet<()>,
 ) -> Result<()> {
     cmd_tx.send(ScrapeCommand::Shutdown)?;
-    // drop(cmd_tx); // this works just as well as sending something, so might switch...
+    // drop(cmd_tx); // this works just as well as sending Shutdown, so might switch...
 
     // this might pose a problem if there are many scrapers running slow jobs, but I just want to
     // see that they finish as they should for now. Might later skip this and just call shutdown
