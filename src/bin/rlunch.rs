@@ -5,6 +5,9 @@ use tracing::{trace, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // TODO: ignore any error from this, as the precense of a .env file should not be required
+    dotenvy::dotenv()?;
+
     let c = cli::Cli::parse_args();
     c.init_logger()?;
 

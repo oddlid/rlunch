@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:alpine
+    container_name: pg
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432/tcp"
+    environment:
+      TZ: Europe/Stockholm
+      POSTGRES_USER: oddmin
+      POSTGRES_PASSWORD: test
+
+  caddy:
+    image: oddlid/caddy:latest
+    container_name: caddy
+    command: caddy file-server -r /srv --listen :8080
+    working_dir: /srv
+    volumes:
+      - ./tmp:/srv:ro
+    ports:
+      - "8080:8080/tcp"
+    environment:
+      TZ: Europe/Stockholm

@@ -27,6 +27,10 @@ pub struct Cli {
     #[arg(short = 'f', long, env, default_value_t, value_enum)]
     pub log_format: LogFormat,
 
+    /// URL for database backend
+    #[arg(short, long, env)]
+    pub database_url: String,
+
     /// Subcommand to run
     #[command(subcommand)]
     pub command: Commands,
