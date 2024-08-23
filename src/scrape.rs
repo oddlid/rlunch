@@ -1,5 +1,7 @@
+use crate::{data, scrapers};
 use anyhow::{anyhow, Result};
 use compact_str::CompactString;
+use reqwest::{Client, IntoUrl};
 use tokio::{
     sync::{broadcast, mpsc},
     task,
@@ -7,7 +9,10 @@ use tokio::{
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, trace};
 
-use crate::{data, scrapers};
+// Name your user agent after your app?
+// static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+// Pretend to be a real browser
+const APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
 
 pub trait RestaurantScraper {
     #[allow(async_fn_in_trait)]
@@ -28,6 +33,27 @@ pub struct ScrapeResult {
 enum ScrapeCommand {
     Run,
     Shutdown,
+}
+
+pub fn get_client() -> Result<Client> {
+    Client::builder()
+        .user_agent(APP_USER_AGENT)
+        .timeout(tokio::time::Duration::from_millis(1500))
+        .build()
+        .map_err(anyhow::Error::from)
+}
+
+pub async fn get<U>(client: &Client, url: U) -> Result<String>
+where
+    U: IntoUrl,
+{
+    client
+        .get(url)
+        .send()
+        .await?
+        .text()
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 pub async fn run(schedule: Option<CompactString>) -> Result<()> {
@@ -87,12 +113,6 @@ async fn run_oneshot(
                     // trace!("Scrape OK: {:?}", v);
                     println!("{:#?}", v);
                     // TODO: update DB
-                    // debug: check each link manually
-                    // for r in v.restaurants {
-                    //     if let Some(u) = r.url {
-                    //         println!("{u}");
-                    //     }
-                    // }
                 },
                 Err(e) => {
                     error!(err = e.to_string(), "Scraping failed");

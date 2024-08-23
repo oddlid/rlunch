@@ -1,6 +1,6 @@
 use crate::{
     data::{Dish, Restaurant},
-    scrape::{RestaurantScraper, ScrapeResult},
+    scrape::{get, get_client, RestaurantScraper, ScrapeResult},
     util::*,
 };
 use anyhow::{anyhow, bail, Result};
@@ -27,11 +27,6 @@ const ERR_INVALID_HTML: &str = "Invalid HTML";
 const COUNTRY_ID: &str = "se";
 const CITY_ID: &str = "gbg";
 const SITE_ID: &str = "lh";
-
-// Name your user agent after your app?
-// static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
-// Pretend to be a real browser
-const APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
 
 lazy_static! {
     static ref SEL_CONTENT: Selector = sel("div.content");
@@ -61,21 +56,12 @@ impl LHScraper {
     pub fn new() -> Self {
         Self {
             url: SCRAPE_URL,
-            client: Client::builder()
-                .user_agent(APP_USER_AGENT)
-                .build()
-                .unwrap(),
+            client: get_client().unwrap(),
         }
     }
 
     async fn get(&self, url: &str) -> Result<String> {
-        self.client
-            .get(url)
-            .send()
-            .await?
-            .text()
-            .await
-            .map_err(anyhow::Error::from)
+        get(&self.client, url).await
     }
 
     async fn get_addr_info(&self, url: &str) -> Result<AddrInfo> {
