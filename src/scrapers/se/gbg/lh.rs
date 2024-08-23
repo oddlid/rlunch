@@ -6,13 +6,22 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use compact_str::{CompactString, ToCompactString};
 use lazy_static::lazy_static;
+use rand::prelude::*;
 use reqwest::Client;
-use scraper::{ElementRef, Html, Selector};
+use scraper::{selectable::Selectable, ElementRef, Html, Selector};
+use slugify::slugify;
 use std::collections::hash_map::HashMap;
+use tracing::{error, trace};
+use url::Url;
 
+// const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
+// https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe
 const SCRAPE_URL: &str = "http://localhost:8080";
 const ATTR_CLASS: &str = "class";
 const ATTR_TITLE: &str = "title";
+const ATTR_HREF: &str = "href";
+const MAPS_DOMAIN: &str = "maps.google.com";
+const ERR_INVALID_HTML: &str = "Invalid HTML";
 
 // For constructing ScrapeResult. Values subject to change.
 const COUNTRY_ID: &str = "se";
@@ -20,19 +29,32 @@ const CITY_ID: &str = "gbg";
 const SITE_ID: &str = "lh";
 
 // Name your user agent after your app?
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+// static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+// Pretend to be a real browser
+const APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
 
 lazy_static! {
+    static ref SEL_CONTENT: Selector = sel("div.content");
     static ref SEL_VIEW_CONTENT: Selector = sel("div.view-content");
     static ref SEL_DISH: Selector = sel("span.dish-name");
     static ref SEL_DISH_TYPE: Selector = sel("div.icon-dish");
     static ref SEL_DISH_PRICE: Selector = sel("div.table-list__column--price");
+    static ref SEL_LINK: Selector = sel("p > a");
+    static ref SEL_ADDR: Selector = sel("div > h3 + p");
 }
 
 #[derive(Default, Clone, Debug)]
 pub struct LHScraper {
     client: Client,
     url: &'static str,
+}
+
+#[derive(Default, Clone, Debug)]
+struct AddrInfo {
+    /// Street addres
+    address: Option<CompactString>,
+    /// Google maps url
+    map_url: Option<CompactString>,
 }
 
 impl LHScraper {
@@ -46,14 +68,75 @@ impl LHScraper {
         }
     }
 
-    async fn get(&self) -> Result<String> {
+    async fn get(&self, url: &str) -> Result<String> {
         self.client
-            .get(self.url)
+            .get(url)
             .send()
             .await?
             .text()
             .await
             .map_err(anyhow::Error::from)
+    }
+
+    async fn get_addr_info(&self, url: &str) -> Result<AddrInfo> {
+        trace!(url = %url, "Fetching address info...");
+        let html = Html::parse_document(&self.get(url).await?);
+
+        let content = match html.select(&SEL_CONTENT).next() {
+            Some(c) => c,
+            None => bail!(ERR_INVALID_HTML),
+        };
+
+        // first search for map links, since they'll contain all we need
+        trace!("Trying to find map link with address....");
+        for anchor in content.select(&SEL_LINK) {
+            if let Some(href) = anchor.attr(ATTR_HREF) {
+                if href.contains(MAPS_DOMAIN) {
+                    let map_url = Url::parse(href)?;
+                    if let Some(q) = map_url.query_pairs().into_owned().next() {
+                        let addr = urlencoding::decode(&q.1)?.into_owned();
+                        return Ok(AddrInfo {
+                            address: Some(addr.trim().to_compact_string()),
+                            map_url: Some(map_url.as_str().to_compact_string()),
+                        });
+                    }
+                }
+            }
+        }
+
+        // try to just find an address, if no links were found, as in the case of Pier 11
+        trace!("No map link found, trying to find just address...");
+        if let Some(p) = content.select(&SEL_ADDR).next() {
+            if let Some(addr) = p.text().next().map(|v| v.trim().to_compact_string()) {
+                return Ok(AddrInfo {
+                    address: Some(addr),
+                    map_url: None,
+                });
+            }
+        }
+
+        Err(anyhow!("No address found"))
+    }
+
+    async fn update_restaurant_addresses(
+        &self,
+        mut restaurants: HashMap<String, Restaurant>,
+    ) -> HashMap<String, Restaurant> {
+        for (k, v) in restaurants.iter_mut() {
+            // Throttle requests to not get blocked
+            wait_random().await;
+
+            let info = self.get_addr_info(k).await;
+            if info.is_err() {
+                let e = info.unwrap_err();
+                error!(err = %e, url = k, "Failed to get address info");
+                continue;
+            }
+            let info = info.unwrap();
+            v.address = info.address;
+            v.map_url = info.map_url;
+        }
+        restaurants
     }
 }
 
@@ -63,37 +146,46 @@ impl RestaurantScraper for LHScraper {
     }
 
     async fn run(&self) -> Result<ScrapeResult> {
-        let html = Html::parse_document(&self.get().await?);
-        let vc = match html.select(&SEL_VIEW_CONTENT).next() {
-            Some(vc) => vc,
-            None => bail!("Invalid HTML"),
-        };
-
         let mut restaurants = HashMap::new();
-        let mut cur_restaurant_name = CompactString::new("");
 
-        for e in vc.child_elements() {
-            match e.attr(ATTR_CLASS) {
-                None => continue,
-                Some(v) => {
-                    if v == ATTR_TITLE {
-                        if let Some(name) = e.text().next().map(|v| v.trim().to_compact_string()) {
-                            cur_restaurant_name = name;
+        // Due to some rust bug/weirdness, we need to wrap this in a scope, otherwise the compiler
+        // will complain about the selection being non-Send, held across an await point
+        {
+            let html = Html::parse_document(&self.get(self.url).await?);
+            let vc = match html.select(&SEL_VIEW_CONTENT).next() {
+                Some(vc) => vc,
+                None => bail!(ERR_INVALID_HTML),
+            };
+
+            let mut cur_restaurant_name = CompactString::new("");
+
+            for e in vc.child_elements() {
+                match e.attr(ATTR_CLASS) {
+                    None => continue,
+                    Some(v) => {
+                        if v == ATTR_TITLE {
+                            if let Some(name) =
+                                e.text().next().map(|v| v.trim().to_compact_string())
+                            {
+                                cur_restaurant_name = name;
+                            }
+                        } else if let Some(d) = parse_dish(&e) {
+                            if cur_restaurant_name.is_empty() {
+                                continue;
+                            }
+                            let entry = restaurants
+                                .entry(get_restaurant_link(&cur_restaurant_name))
+                                .or_insert_with(|| Restaurant::new(&cur_restaurant_name));
+                            entry.dishes.push(d);
                         }
-                    } else if let Some(d) = parse_dish(&e) {
-                        if cur_restaurant_name.is_empty() {
-                            continue;
-                        }
-                        let entry = restaurants
-                            .entry(cur_restaurant_name.clone())
-                            .or_insert_with(|| Restaurant::new(&cur_restaurant_name));
-                        entry.dishes.push(d);
                     }
                 }
             }
         }
 
-        // TODO: Fetch details about each restaurant, as in the original
+        let restaurants = self
+            .update_restaurant_addresses(update_restaurant_links(restaurants))
+            .await;
 
         Ok(ScrapeResult {
             country_id: COUNTRY_ID.to_compact_string(),
@@ -102,6 +194,13 @@ impl RestaurantScraper for LHScraper {
             restaurants: restaurants.into_values().collect(),
         })
     }
+}
+
+/// Set the url field of each restaurant to the key under which it's stored in the given map
+fn update_restaurant_links(mut r: HashMap<String, Restaurant>) -> HashMap<String, Restaurant> {
+    r.iter_mut()
+        .for_each(|(k, v)| v.url = Some(k.to_compact_string()));
+    r
 }
 
 fn parse_dish(e: &ElementRef) -> Option<Dish> {
@@ -132,4 +231,29 @@ fn get_dish_name_and_desc(e: &ElementRef) -> (Option<CompactString>, Option<Comp
             (name, desc)
         }
     }
+}
+
+fn get_restaurant_link(name: &str) -> String {
+    // slugify will replace apostrophes with dashes, so we need to strip them out first in order to
+    // get the same slugs as lindholmen.se uses.
+    // They also seem to remove certain words, like "by" and "of", so we strip those as well.
+    // format!("{}{}", URL_PREFIX, slugify!(&str::replace(name, "'", ""), stop_words = "by,of")))
+
+    // Local dev version
+    format!(
+        "{}/{}",
+        SCRAPE_URL,
+        slugify!(&str::replace(name, "'", ""), stop_words = "by,of")
+    )
+}
+
+/// Get a random value for using with sleep between requests
+fn get_random_ms() -> u64 {
+    // in production, I think 1000-1500 could be good values.
+    // It doesn't matter that it takes some time, as it runs in the background
+    thread_rng().gen_range(500..=1000)
+}
+
+async fn wait_random() {
+    tokio::time::sleep(tokio::time::Duration::from_millis(get_random_ms())).await;
 }

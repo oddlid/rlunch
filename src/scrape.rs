@@ -84,8 +84,15 @@ async fn run_oneshot(
         res = res_rx.recv() => match res {
             Some(v) => match v {
                 Ok(v) => {
-                    trace!("Scrape OK: {:?}", v);
+                    // trace!("Scrape OK: {:?}", v);
+                    println!("{:#?}", v);
                     // TODO: update DB
+                    // debug: check each link manually
+                    // for r in v.restaurants {
+                    //     if let Some(u) = r.url {
+                    //         println!("{u}");
+                    //     }
+                    // }
                 },
                 Err(e) => {
                     error!(err = e.to_string(), "Scraping failed");
