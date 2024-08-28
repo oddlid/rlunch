@@ -8,13 +8,14 @@ services:
       - "5432:5432/tcp"
     environment:
       TZ: Europe/Stockholm
-      POSTGRES_USER: oddmin
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: test
 
   caddy:
     image: oddlid/caddy:latest
     container_name: caddy
     command: caddy file-server -r /srv --listen :8080
+    restart: always
     working_dir: /srv
     volumes:
       - ./tmp:/srv:ro

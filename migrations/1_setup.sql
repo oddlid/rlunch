@@ -1,4 +1,4 @@
-create extension if not exists "uuid-ossp";
+-- create extension if not exists "uuid-ossp";
 
 create or replace function set_updated_at()
     returns trigger as
@@ -18,7 +18,7 @@ begin
         ON %s
         FOR EACH ROW
         WHEN (OLD is distinct from NEW)
-    EXECUTE FUNCTION set_updated_at();', tablename);
+        EXECUTE FUNCTION set_updated_at();', tablename);
 end;
 $$ language plpgsql;
 
