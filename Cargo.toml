@@ -49,7 +49,12 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 ] }
 slugify = { version = "0.1" }
 rand = { version = "0.8" }
-sqlx = { version = "0.8", features = ["runtime-tokio"] }
+sqlx = { version = "0.8", features = [
+  "runtime-tokio",
+  "postgres",
+  "chrono",
+  "uuid",
+] }
 dotenvy = { version = "0.15" }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
 

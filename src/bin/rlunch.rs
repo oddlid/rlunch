@@ -5,8 +5,9 @@ use tracing::{trace, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // TODO: ignore any error from this, as the precense of a .env file should not be required
-    dotenvy::dotenv()?;
+    if let Err(e) = dotenvy::dotenv() {
+        warn!(err = %e, "Failed to load .env file");
+    }
 
     let c = cli::Cli::parse_args();
     c.init_logger()?;
@@ -24,8 +25,9 @@ async fn main() -> Result<()> {
 // #[tracing::instrument]
 async fn dispatch_commands(c: cli::Cli) -> Result<()> {
     trace!("Checking args and running desired subcommand");
+    let db = c.get_pg_pool().await?;
     match c.command {
-        cli::Commands::Scrape { cron } => scrape::run(cron).await?,
+        cli::Commands::Scrape { cron } => scrape::run(db, cron).await?,
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(listen).await?,
             cli::ServeCommands::Admin => run_server_admin(listen).await?,

@@ -6,13 +6,13 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use compact_str::{CompactString, ToCompactString};
 use lazy_static::lazy_static;
-use rand::prelude::*;
 use reqwest::Client;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 use slugify::slugify;
 use std::collections::hash_map::HashMap;
 use tracing::{error, trace};
 use url::Url;
+use uuid::Uuid;
 
 // const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
 // https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe
@@ -22,11 +22,6 @@ const ATTR_TITLE: &str = "title";
 const ATTR_HREF: &str = "href";
 const MAPS_DOMAIN: &str = "maps.google.com";
 const ERR_INVALID_HTML: &str = "Invalid HTML";
-
-// For constructing ScrapeResult. Values subject to change.
-const COUNTRY_ID: &str = "se";
-const CITY_ID: &str = "gbg";
-const SITE_ID: &str = "lh";
 
 lazy_static! {
     static ref SEL_CONTENT: Selector = sel("div.content");
@@ -42,6 +37,7 @@ lazy_static! {
 pub struct LHScraper {
     client: Client,
     url: &'static str,
+    site_id: Uuid,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -53,10 +49,11 @@ struct AddrInfo {
 }
 
 impl LHScraper {
-    pub fn new() -> Self {
+    pub fn new(site_id: Uuid) -> Self {
         Self {
-            url: SCRAPE_URL,
+            url: SCRAPE_URL, // TODO: evaluate if this should rather be passed in
             client: get_client().unwrap(),
+            site_id,
         }
     }
 
@@ -110,7 +107,7 @@ impl LHScraper {
     ) -> HashMap<String, Restaurant> {
         for (k, v) in restaurants.iter_mut() {
             // Throttle requests to not get blocked
-            wait_random().await;
+            wait_random_range_ms(100, 500).await;
 
             let info = self.get_addr_info(k).await;
             if info.is_err() {
@@ -174,9 +171,7 @@ impl RestaurantScraper for LHScraper {
             .await;
 
         Ok(ScrapeResult {
-            country_id: COUNTRY_ID.to_compact_string(),
-            city_id: CITY_ID.to_compact_string(),
-            site_id: SITE_ID.to_compact_string(),
+            site_id: self.site_id,
             restaurants: restaurants.into_values().collect(),
         })
     }
@@ -231,15 +226,4 @@ fn get_restaurant_link(name: &str) -> String {
         SCRAPE_URL,
         slugify!(&str::replace(name, "'", ""), stop_words = "by,of")
     )
-}
-
-/// Get a random value for using with sleep between requests
-fn get_random_ms() -> u64 {
-    // in production, I think 1000-1500 could be good values.
-    // It doesn't matter that it takes some time, as it runs in the background
-    thread_rng().gen_range(500..=1000)
-}
-
-async fn wait_random() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(get_random_ms())).await;
 }

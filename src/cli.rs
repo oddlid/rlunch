@@ -2,6 +2,7 @@ use anyhow::{Error, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{ErrorLevel, LevelFilter, Verbosity};
 use compact_str::CompactString;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::io;
 use tracing_subscriber::filter::LevelFilter as TFilter;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
@@ -121,6 +122,14 @@ impl Cli {
             .with(layer)
             .init();
         Ok(())
+    }
+
+    pub async fn get_pg_pool(&self) -> Result<PgPool> {
+        PgPoolOptions::new()
+            .max_connections(50) // TODO: evaluate this value
+            .connect(&self.database_url)
+            .await
+            .map_err(Error::from)
     }
 }
 
