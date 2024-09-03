@@ -1,8 +1,9 @@
 use compact_str::{CompactString, ToCompactString};
 use nom::number::complete;
-use rand::prelude::*;
 use scraper::{ElementRef, Selector};
-use tokio::time::{sleep, Duration};
+
+// use rand::prelude::*;
+// use tokio::time::{sleep, Duration};
 
 pub fn sel(selector: &str) -> Selector {
     Selector::parse(selector).unwrap()
@@ -31,10 +32,10 @@ pub fn reduce_whitespace(s: &str) -> CompactString {
 
 // we need to have this split into a separate function, so that thread_rng is dropped before the
 // call to sleep, since ThreadRng is not Send
-fn get_random_ms(min: u64, max: u64) -> u64 {
-    thread_rng().gen_range(min..=max)
-}
-
-pub async fn wait_random_range_ms(min: u64, max: u64) {
-    sleep(Duration::from_millis(get_random_ms(min, max))).await
-}
+// fn get_random_ms(min: u64, max: u64) -> u64 {
+//     thread_rng().gen_range(min..=max)
+// }
+//
+// pub async fn wait_random_range_ms(min: u64, max: u64) {
+//     sleep(Duration::from_millis(get_random_ms(min, max))).await
+// }

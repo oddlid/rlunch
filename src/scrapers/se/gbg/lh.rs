@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 use slugify::slugify;
-use std::collections::hash_map::HashMap;
+use std::{collections::hash_map::HashMap, time::Duration};
 use tracing::{error, trace};
 use url::Url;
 use uuid::Uuid;
@@ -38,6 +38,7 @@ pub struct LHScraper {
     client: Client,
     url: &'static str,
     site_id: Uuid,
+    request_delay: Duration,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -49,11 +50,12 @@ struct AddrInfo {
 }
 
 impl LHScraper {
-    pub fn new(site_id: Uuid) -> Self {
+    pub fn new(site_id: Uuid, request_delay: Duration) -> Self {
         Self {
             url: SCRAPE_URL, // TODO: evaluate if this should rather be passed in
             client: get_client().unwrap(),
             site_id,
+            request_delay,
         }
     }
 
@@ -107,7 +109,7 @@ impl LHScraper {
     ) -> HashMap<String, Restaurant> {
         for (k, v) in restaurants.iter_mut() {
             // Throttle requests to not get blocked
-            wait_random_range_ms(100, 500).await;
+            tokio::time::sleep(self.request_delay).await;
 
             let info = self.get_addr_info(k).await;
             if info.is_err() {

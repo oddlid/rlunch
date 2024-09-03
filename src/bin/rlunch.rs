@@ -27,7 +27,10 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
     trace!("Checking args and running desired subcommand");
     let db = c.get_pg_pool().await?;
     match c.command {
-        cli::Commands::Scrape { cron } => scrape::run(db, cron).await?,
+        cli::Commands::Scrape {
+            cron,
+            request_delay,
+        } => scrape::run(db, cron, request_delay.into()).await?,
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(listen).await?,
             cli::ServeCommands::Admin => run_server_admin(listen).await?,

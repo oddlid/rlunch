@@ -3,18 +3,26 @@ use sqlx::PgPool;
 use tracing::trace;
 use uuid::Uuid;
 
-pub async fn get_site_uuid(
-    db: &PgPool,
-    country_url_id: &str,
-    city_url_id: &str,
-    site_url_id: &str,
-) -> Result<Uuid> {
-    trace!(
-        country_url_id,
-        city_url_id,
-        site_url_id,
-        "Searching for site ID..."
-    );
+#[derive(Debug)]
+pub struct SiteKey<'a> {
+    pub country_url_id: &'a str,
+    pub city_url_id: &'a str,
+    pub site_url_id: &'a str,
+}
+
+impl<'a> SiteKey<'a> {
+    pub fn new(country_url_id: &'a str, city_url_id: &'a str, site_url_id: &'a str) -> Self {
+        Self {
+            country_url_id,
+            city_url_id,
+            site_url_id,
+        }
+    }
+}
+
+pub async fn get_site_uuid(db: &PgPool, key: SiteKey<'_>) -> Result<Uuid> {
+    trace!(?key, "Searching for site ID...");
+
     let id = sqlx::query_scalar!(
         r#"
             with co as (
@@ -24,9 +32,9 @@ pub async fn get_site_uuid(
             )
             select site_id from site, ci where site.city_id = ci.city_id and url_id = $3;
         "#,
-        country_url_id,
-        city_url_id,
-        site_url_id
+        key.country_url_id,
+        key.city_url_id,
+        key.site_url_id
     )
     .fetch_one(db)
     .await?;

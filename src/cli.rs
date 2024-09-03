@@ -28,7 +28,7 @@ pub struct Cli {
     #[arg(short = 'f', long, env, default_value_t, value_enum)]
     pub log_format: LogFormat,
 
-    /// URL for database backend
+    /// URL for Postgres database backend
     #[arg(short, long, env)]
     pub database_url: String,
 
@@ -44,6 +44,10 @@ pub enum Commands {
         /// Cron spec for running scrapers
         #[arg(short, long)]
         cron: Option<CompactString>,
+
+        /// How long to wait between requests to the same domain
+        #[arg(short, long, default_value = "1500ms")]
+        request_delay: humantime::Duration,
     },
     /// Start a server
     Serve {
@@ -126,7 +130,7 @@ impl Cli {
 
     pub async fn get_pg_pool(&self) -> Result<PgPool> {
         PgPoolOptions::new()
-            .max_connections(50) // TODO: evaluate this value
+            .max_connections(20) // TODO: evaluate this value
             .connect(&self.database_url)
             .await
             .map_err(Error::from)

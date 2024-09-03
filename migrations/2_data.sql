@@ -78,14 +78,18 @@ with ins_country as (
     'gbg'
   )
   returning *
-), ins_site as (
-  insert into site (city_id, name, url_id, comment)
-  values (
+)
+insert into site (city_id, name, url_id, comment)
+values
+  (
     (select city_id from ins_city),
     'Lindholmen',
     'lh',
     'GBG Silicon Valley'
-  )
-  returning *
-)
-select * from ins_site;
+  ),
+  (
+    (select city_id from ins_city),
+    'Majorna',
+    'maj',
+    'Hipster Hell'
+  );

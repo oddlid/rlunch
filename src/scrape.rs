@@ -1,8 +1,13 @@
-use crate::{data, db, scrapers};
+use crate::{
+    data,
+    db::{get_site_uuid, SiteKey},
+    scrapers,
+};
 use anyhow::{anyhow, Result};
 use compact_str::CompactString;
 use reqwest::{Client, IntoUrl};
 use sqlx::PgPool;
+use std::time::Duration;
 use tokio::{
     sync::{broadcast, mpsc},
     task,
@@ -56,17 +61,29 @@ where
         .map_err(anyhow::Error::from)
 }
 
-pub async fn run(db: PgPool, schedule: Option<CompactString>) -> Result<()> {
+pub async fn run(
+    pg: PgPool,
+    schedule: Option<CompactString>,
+    request_delay: Duration,
+) -> Result<()> {
     let shutdown = crate::signals::shutdown_channel().await?;
     let (cmd_tx, _) = broadcast::channel(8); // don't know optimal buffer size yet
     let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(100); // same here
-    match start_scheduler(schedule, cmd_tx.clone()).await {
-        Ok(sched) => run_loop(db, sched, shutdown, cmd_tx, res_tx, res_rx).await,
+
+    // we don't use ? in calls here, since we want to first close the PgPool before returning the
+    // result
+    let res = match start_scheduler(schedule, cmd_tx.clone()).await {
+        Ok(sched) => run_loop(&pg, request_delay, sched, shutdown, cmd_tx, res_tx, res_rx).await,
         Err(e) => {
             trace!("{}: running one-shot scrape", e);
-            run_oneshot(db, shutdown, cmd_tx, res_tx, res_rx).await
+            run_oneshot(&pg, request_delay, shutdown, cmd_tx, res_tx, res_rx).await
         }
-    }
+    };
+
+    // cleanup
+    pg.close().await;
+
+    res
 }
 
 async fn start_scheduler(
@@ -93,13 +110,14 @@ async fn start_scheduler(
 }
 
 async fn run_oneshot(
-    db: PgPool,
+    pg: &PgPool,
+    request_delay: Duration,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
     res_tx: mpsc::Sender<Result<ScrapeResult>>,
     mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
 ) -> Result<()> {
-    let tasks = setup_scrapers(&db, cmd_tx.clone(), res_tx).await?;
+    let tasks = setup_scrapers(pg, request_delay, cmd_tx.clone(), res_tx).await?;
 
     trace!("Triggering scrapers once...");
     cmd_tx.send(ScrapeCommand::Run)?;
@@ -130,20 +148,20 @@ async fn run_oneshot(
     }
 
     stop_scrapers(cmd_tx, tasks).await?;
-    db.close().await;
 
     Ok(())
 }
 
 async fn run_loop(
-    db: PgPool,
+    pg: &PgPool,
+    request_delay: Duration,
     mut sched: JobScheduler,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
     res_tx: mpsc::Sender<Result<ScrapeResult>>,
     mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
 ) -> Result<()> {
-    let tasks = setup_scrapers(&db, cmd_tx.clone(), res_tx).await?;
+    let tasks = setup_scrapers(pg, request_delay, cmd_tx.clone(), res_tx).await?;
 
     loop {
         tokio::select! {
@@ -171,27 +189,31 @@ async fn run_loop(
 
     sched.shutdown().await?;
     stop_scrapers(cmd_tx, tasks).await?;
-    db.close().await;
 
     Ok(())
 }
 
 // manual add/remove scraper implementations
 async fn setup_scrapers(
-    db: &PgPool,
+    pg: &PgPool,
+    request_delay: Duration,
     cmds: broadcast::Sender<ScrapeCommand>,
     results: mpsc::Sender<Result<ScrapeResult>>,
 ) -> Result<task::JoinSet<()>> {
-    let uuid_lh = db::get_site_uuid(&db, "se", "gbg", "lh").await?;
-
     let mut set = task::JoinSet::new();
     set.spawn(run_scraper(
-        scrapers::se::gbg::lh::LHScraper::new(uuid_lh),
+        scrapers::se::gbg::lh::LHScraper::new(
+            get_site_uuid(pg, SiteKey::new("se", "gbg", "lh")).await?,
+            request_delay,
+        ),
         cmds.subscribe(),
         results.clone(),
     ));
     set.spawn(run_scraper(
-        scrapers::se::gbg::majorna::MajornaScraper::new(Uuid::new_v4()), // TODO: use uuid fetched from DB for this specific site
+        scrapers::se::gbg::majorna::MajornaScraper::new(
+            get_site_uuid(pg, SiteKey::new("se", "gbg", "maj")).await?,
+            request_delay,
+        ),
         cmds.subscribe(),
         results.clone(),
     ));

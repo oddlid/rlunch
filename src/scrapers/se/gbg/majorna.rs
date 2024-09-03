@@ -1,26 +1,28 @@
 // Currently just a dummy implementation to see how it all works with several scrapers
 
-use std::collections::HashSet;
-
 use crate::{
     data::{Dish, Restaurant},
     scrape::{RestaurantScraper, ScrapeResult},
-    util::wait_random_range_ms,
 };
 use anyhow::{bail, Result};
 use chrono::Local;
 use compact_str::CompactString;
+use std::{collections::HashSet, time::Duration};
 use tracing::trace;
 use uuid::Uuid;
 
 #[derive(Default, Clone, Debug)]
 pub struct MajornaScraper {
     site_id: Uuid,
+    request_delay: Duration,
 }
 
 impl MajornaScraper {
-    pub fn new(site_id: Uuid) -> Self {
-        Self { site_id }
+    pub fn new(site_id: Uuid, request_delay: Duration) -> Self {
+        Self {
+            site_id,
+            request_delay,
+        }
     }
 }
 
@@ -30,8 +32,8 @@ impl RestaurantScraper for MajornaScraper {
     }
 
     async fn run(&self) -> Result<ScrapeResult> {
-        trace!("Faking taking time to do work...");
-        wait_random_range_ms(500, 1000).await;
+        trace!(?self.request_delay, "Faking taking time to do work...");
+        tokio::time::sleep(self.request_delay).await;
 
         if rand::random() {
             bail!("{}: Randomly generated error", self.name());
