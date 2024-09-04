@@ -1,7 +1,6 @@
 use chrono::{DateTime, Local};
-use compact_str::{CompactString, ToCompactString};
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::HashMap, hash_set::HashSet};
+use std::collections::hash_map::HashMap;
 use std::fmt::Display;
 
 // I'm evaluating if I should move away from having all these nested structs, and rather have them
@@ -29,19 +28,21 @@ use std::fmt::Display;
 //   manager responsible for receiving results and updating the DB. Could be with authentication,
 //   or without, if all scrapers are local and trusted.
 //
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
+#[sqlx(default)]
 pub struct Dish {
     /// Name of the dish, e.g. "meatballs"
-    pub name: CompactString,
+    #[sqlx(rename = "dish_name")]
+    pub name: String,
     /// More details about the dish, e.g. "with spaghetti"
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<CompactString>,
+    pub description: Option<String>,
     // Extra info, e.g. "contains nuts"
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<CompactString>,
+    pub comment: Option<String>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
-    pub tags: HashSet<CompactString>,
+    pub tags: Vec<String>,
     /// Price, in whatever currency is in use
     pub price: f32,
 }
@@ -58,30 +59,33 @@ impl Display for Dish {
 impl Dish {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_compact_string(),
+            name: name.into(),
             ..Default::default()
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
+#[sqlx(default)]
 pub struct Restaurant {
     /// Name of restaurant
-    pub name: CompactString,
+    #[sqlx(rename = "restaurant_name")]
+    pub name: String,
     /// Extra info
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<CompactString>,
+    pub comment: Option<String>,
     /// Street address
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address: Option<CompactString>,
+    pub address: Option<String>,
     /// Homepage
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<CompactString>,
+    pub url: Option<String>,
     /// Google maps URL
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub map_url: Option<CompactString>,
+    pub map_url: Option<String>,
     /// When the scraping was last done
+    #[sqlx(rename = "created_at")]
     pub parsed_at: DateTime<Local>,
     /// List of current dishes
     pub dishes: Vec<Dish>,
@@ -90,29 +94,38 @@ pub struct Restaurant {
 impl Restaurant {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_compact_string(),
+            name: name.into(),
             parsed_at: Local::now(),
             ..Default::default()
         }
     }
+
+    // pub fn opt_comment(&self) -> Option<&str> {
+    //     // match self.comment.as_ref() {
+    //     //     Some(v) => Some(v),
+    //     //     None => None,
+    //     // }
+    //
+    //     self.comment.as_ref().map(|v| v.as_str())
+    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 #[serde(default)]
 pub struct Site {
     /// Name of site/area
-    pub name: CompactString,
+    pub name: String,
     /// Extra info
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<CompactString>,
+    pub comment: Option<String>,
     /// List of current restaurants
-    pub restaurants: HashMap<CompactString, Restaurant>,
+    pub restaurants: HashMap<String, Restaurant>,
 }
 
 impl Site {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_compact_string(),
+            name: name.into(),
             ..Default::default()
         }
     }
@@ -122,15 +135,15 @@ impl Site {
 #[serde(default)]
 pub struct City {
     /// Name of city
-    pub name: CompactString,
+    pub name: String,
     /// List of current sites
-    pub sites: HashMap<CompactString, Site>,
+    pub sites: HashMap<String, Site>,
 }
 
 impl City {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_compact_string(),
+            name: name.into(),
             ..Default::default()
         }
     }
@@ -140,18 +153,18 @@ impl City {
 #[serde(default)]
 pub struct Country {
     /// Name of country
-    pub name: CompactString,
+    pub name: String,
     /// Currency abbreviation to use as suffix for dish prices
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency_suffix: Option<CompactString>,
+    pub currency_suffix: Option<String>,
     /// List of current cities
-    pub cities: HashMap<CompactString, City>,
+    pub cities: HashMap<String, City>,
 }
 
 impl Country {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_compact_string(),
+            name: name.into(),
             ..Default::default()
         }
     }
@@ -161,7 +174,7 @@ impl Country {
 #[serde(default)]
 pub struct LunchData {
     /// List of current countries
-    pub countries: HashMap<CompactString, Country>,
+    pub countries: HashMap<String, Country>,
 }
 
 impl LunchData {
@@ -178,8 +191,8 @@ mod tests {
     #[test]
     fn dish_display() {
         let d = Dish {
-            name: CompactString::from("meat"),
-            description: Some(CompactString::from("balls")),
+            name: String::from("meat"),
+            description: Some(String::from("balls")),
             ..Default::default()
         };
         assert_eq!("meat balls", format!("{d}"));
@@ -201,10 +214,10 @@ mod tests {
     #[ignore = "Visual inspection"]
     fn show_structure() {
         let mut d = Dish::new("meat");
-        d.description = Some(CompactString::from("balls"));
+        d.description = Some(String::from("balls"));
         d.price = 120.0;
-        d.tags.insert(CompactString::from("carnivora"));
-        d.tags.insert(CompactString::from("yummy"));
+        d.tags.push(String::from("carnivora"));
+        d.tags.push(String::from("yummy"));
 
         let mut r = Restaurant::new("Pasta House");
         r.dishes.push(d);

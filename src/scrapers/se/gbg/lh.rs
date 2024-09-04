@@ -4,7 +4,6 @@ use crate::{
     util::*,
 };
 use anyhow::{anyhow, bail, Result};
-use compact_str::{CompactString, ToCompactString};
 use lazy_static::lazy_static;
 use reqwest::Client;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
@@ -44,9 +43,9 @@ pub struct LHScraper {
 #[derive(Default, Clone, Debug)]
 struct AddrInfo {
     /// Street addres
-    address: Option<CompactString>,
+    address: Option<String>,
     /// Google maps url
-    map_url: Option<CompactString>,
+    map_url: Option<String>,
 }
 
 impl LHScraper {
@@ -81,8 +80,8 @@ impl LHScraper {
                     if let Some(q) = map_url.query_pairs().into_owned().next() {
                         let addr = urlencoding::decode(&q.1)?.into_owned();
                         return Ok(AddrInfo {
-                            address: Some(addr.trim().to_compact_string()),
-                            map_url: Some(map_url.as_str().to_compact_string()),
+                            address: Some(addr.trim().into()),
+                            map_url: Some(map_url.as_str().into()),
                         });
                     }
                 }
@@ -92,7 +91,7 @@ impl LHScraper {
         // try to just find an address, if no links were found, as in the case of Pier 11
         trace!("No map link found, trying to find just address...");
         if let Some(p) = content.select(&SEL_ADDR).next() {
-            if let Some(addr) = p.text().next().map(|v| v.trim().to_compact_string()) {
+            if let Some(addr) = p.text().next().map(|v| v.trim().into()) {
                 return Ok(AddrInfo {
                     address: Some(addr),
                     map_url: None,
@@ -142,16 +141,14 @@ impl RestaurantScraper for LHScraper {
                 None => bail!(ERR_INVALID_HTML),
             };
 
-            let mut cur_restaurant_name = CompactString::new("");
+            let mut cur_restaurant_name = String::new();
 
             for e in vc.child_elements() {
                 match e.attr(ATTR_CLASS) {
                     None => continue,
                     Some(v) => {
                         if v == ATTR_TITLE {
-                            if let Some(name) =
-                                e.text().next().map(|v| v.trim().to_compact_string())
-                            {
+                            if let Some(name) = e.text().next().map(|v| v.trim().into()) {
                                 cur_restaurant_name = name;
                             }
                         } else if let Some(d) = parse_dish(&e) {
@@ -181,8 +178,7 @@ impl RestaurantScraper for LHScraper {
 
 /// Set the url field of each restaurant to the key under which it's stored in the given map
 fn update_restaurant_links(mut r: HashMap<String, Restaurant>) -> HashMap<String, Restaurant> {
-    r.iter_mut()
-        .for_each(|(k, v)| v.url = Some(k.to_compact_string()));
+    r.iter_mut().for_each(|(k, v)| v.url = Some(k.clone()));
     r
 }
 
@@ -199,17 +195,17 @@ fn parse_dish(e: &ElementRef) -> Option<Dish> {
         ..Default::default()
     };
     if let Some(t) = get_text(e, &SEL_DISH_TYPE) {
-        dish.tags.insert(t);
+        dish.tags.push(t);
     }
     Some(dish)
 }
 
-fn get_dish_name_and_desc(e: &ElementRef) -> (Option<CompactString>, Option<CompactString>) {
+fn get_dish_name_and_desc(e: &ElementRef) -> (Option<String>, Option<String>) {
     match e.select(&SEL_DISH).next() {
         None => (None, None),
         Some(v) => {
             let mut t = v.text();
-            let name = t.next().map(|v| v.trim().to_compact_string());
+            let name = t.next().map(|v| v.trim().into());
             let desc = t.next().map(reduce_whitespace);
             (name, desc)
         }

@@ -57,6 +57,7 @@ create table dish
   description text,
   comment text,
   tags text[],
+  price float(4),
   created_at timestamptz not null default now(),
   updated_at timestamptz
 );

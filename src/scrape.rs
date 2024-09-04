@@ -1,8 +1,4 @@
-use crate::{
-    data,
-    db::{get_site_uuid, SiteKey},
-    scrapers,
-};
+use crate::{data, db, scrapers};
 use anyhow::{anyhow, Result};
 use compact_str::CompactString;
 use reqwest::{Client, IntoUrl};
@@ -13,7 +9,7 @@ use tokio::{
     task,
 };
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, trace};
+use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 // Name your user agent after your app?
@@ -96,7 +92,7 @@ async fn start_scheduler(
             trace!("Setting up cron job with schedule: {s}");
             sched
                 .add(Job::new(s.as_str(), move |uid, _lock| {
-                    trace!(id = %uid, "Notifying all scrapers to run");
+                    trace!(%uid, "Notifying all scrapers to run");
                     tx.send(ScrapeCommand::Run)
                         .expect("Failed to send scheduled run command");
                 })?)
@@ -107,6 +103,41 @@ async fn start_scheduler(
         }
         None => Err(anyhow!("empty cron spec")),
     }
+}
+
+/// returns false if the call site should break out of containing loop.
+/// res_rx will be closed when false is returned.
+async fn handle_result(
+    pg: &PgPool,
+    shutdown: &mut broadcast::Receiver<()>,
+    res_rx: &mut mpsc::Receiver<Result<ScrapeResult>>,
+) -> bool {
+    tokio::select! {
+        _ = shutdown.recv() => {
+            trace!("Got shutdown signal");
+            res_rx.close();
+            return false;
+        },
+        res = res_rx.recv() => match res {
+            Some(v) => match v {
+                Ok(v) => {
+                    debug!(%v.site_id, "Got scrape result, updating DB...");
+                    if let Err(e) = db::update_site(pg, v).await {
+                        error!(err = %e, "Failed to update DB");
+                    }
+                },
+                Err(e) => {
+                    error!(err = %e, "Scraping failed");
+                },
+            },
+            None => {
+                trace!("Channel closed, quitting");
+                res_rx.close(); // we close here in case None is due to the sender being dropped
+                return false;
+            }
+        },
+    }
+    true
 }
 
 async fn run_oneshot(
@@ -123,27 +154,8 @@ async fn run_oneshot(
     cmd_tx.send(ScrapeCommand::Run)?;
 
     for _ in 0..tasks.len() {
-        tokio::select! {
-            _ = shutdown.recv() => {
-                trace!("Got shutdown signal");
-                break;
-            },
-            res = res_rx.recv() => match res {
-                Some(v) => match v {
-                    Ok(v) => {
-                        // trace!("Scrape OK: {:?}", v);
-                        println!("{:#?}", v);
-                        // TODO: update DB
-                    },
-                    Err(e) => {
-                        error!(err = e.to_string(), "Scraping failed");
-                    },
-                },
-                None => {
-                    trace!("Channel closed, quitting");
-                    break;
-                }
-            },
+        if !handle_result(pg, &mut shutdown, &mut res_rx).await {
+            break;
         }
     }
 
@@ -164,26 +176,8 @@ async fn run_loop(
     let tasks = setup_scrapers(pg, request_delay, cmd_tx.clone(), res_tx).await?;
 
     loop {
-        tokio::select! {
-            _ = shutdown.recv() => {
-                trace!("Got shutdown signal");
-                break;
-            },
-            res = res_rx.recv() => match res {
-                Some(v) => match v {
-                    Ok(v) => {
-                        trace!("Scrape OK: {:?}", v);
-                        // TODO: update DB
-                    },
-                    Err(e) => {
-                        error!(err = e.to_string(), "Scraping failed");
-                    },
-                },
-                None => {
-                    trace!("Channel closed, quitting");
-                    break;
-                },
-            },
+        if !handle_result(pg, &mut shutdown, &mut res_rx).await {
+            break;
         }
     }
 
@@ -203,7 +197,7 @@ async fn setup_scrapers(
     let mut set = task::JoinSet::new();
     set.spawn(run_scraper(
         scrapers::se::gbg::lh::LHScraper::new(
-            get_site_uuid(pg, SiteKey::new("se", "gbg", "lh")).await?,
+            db::get_site_uuid(pg, db::SiteKey::new("se", "gbg", "lh")).await?,
             request_delay,
         ),
         cmds.subscribe(),
@@ -211,7 +205,7 @@ async fn setup_scrapers(
     ));
     set.spawn(run_scraper(
         scrapers::se::gbg::majorna::MajornaScraper::new(
-            get_site_uuid(pg, SiteKey::new("se", "gbg", "maj")).await?,
+            db::get_site_uuid(pg, db::SiteKey::new("se", "gbg", "maj")).await?,
             request_delay,
         ),
         cmds.subscribe(),

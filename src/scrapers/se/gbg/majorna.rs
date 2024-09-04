@@ -4,10 +4,9 @@ use crate::{
     data::{Dish, Restaurant},
     scrape::{RestaurantScraper, ScrapeResult},
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::Local;
-use compact_str::CompactString;
-use std::{collections::HashSet, time::Duration};
+use std::time::Duration;
 use tracing::trace;
 use uuid::Uuid;
 
@@ -35,33 +34,33 @@ impl RestaurantScraper for MajornaScraper {
         trace!(?self.request_delay, "Faking taking time to do work...");
         tokio::time::sleep(self.request_delay).await;
 
-        if rand::random() {
-            bail!("{}: Randomly generated error", self.name());
-        }
+        // if rand::random() {
+        //     bail!("{}: Randomly generated error", self.name());
+        // }
         Ok(ScrapeResult {
             site_id: self.site_id,
             restaurants: vec![Restaurant {
-                name: CompactString::from("Old Town"),
-                comment: Some(CompactString::from("Second home")),
-                address: Some(CompactString::from("Godhemsgatan 7, 414 68 Göteborg")),
-                url: Some(CompactString::from("https://www.oldtown.se/")),
-                map_url: Some(CompactString::from(
+                name: String::from("Old Town"),
+                comment: Some(String::from("Second home")),
+                address: Some(String::from("Godhemsgatan 7, 414 68 Göteborg")),
+                url: Some(String::from("https://www.oldtown.se/")),
+                map_url: Some(String::from(
                     "https://www.google.se/maps/place/Godhemsgatan+7,+414+68+G%C3%B6teborg",
                 )),
                 parsed_at: Local::now(),
                 dishes: vec![
                     Dish {
-                        name: CompactString::from("Grekiskt"),
-                        description: Some(CompactString::from("med stor stark")),
-                        comment: Some(CompactString::from("kan innehålla grävling")),
-                        tags: HashSet::new(),
+                        name: String::from("Grekiskt"),
+                        description: Some(String::from("med stor stark")),
+                        comment: Some(String::from("kan innehålla grävling")),
+                        tags: Vec::new(),
                         price: 149.0,
                     },
                     Dish {
-                        name: CompactString::from("Pizza"),
-                        description: Some(CompactString::from("med saker")),
-                        comment: Some(CompactString::from("kan innehålla rotta")),
-                        tags: HashSet::new(),
+                        name: String::from("Pizza"),
+                        description: Some(String::from("med saker")),
+                        comment: Some(String::from("kan innehålla rotta")),
+                        tags: Vec::new(),
                         price: 89.0,
                     },
                 ],

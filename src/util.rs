@@ -1,18 +1,14 @@
-use compact_str::{CompactString, ToCompactString};
 use nom::number::complete;
 use scraper::{ElementRef, Selector};
-
-// use rand::prelude::*;
-// use tokio::time::{sleep, Duration};
 
 pub fn sel(selector: &str) -> Selector {
     Selector::parse(selector).unwrap()
 }
 
-pub fn get_text(e: &ElementRef, sel: &Selector) -> Option<CompactString> {
+pub fn get_text(e: &ElementRef, sel: &Selector) -> Option<String> {
     match e.select(sel).next() {
         None => None,
-        Some(v) => v.text().next().map(|v| v.trim().to_compact_string()),
+        Some(v) => v.text().next().map(|v| v.trim().into()),
     }
 }
 
@@ -23,11 +19,8 @@ pub fn parse_float(s: &str) -> f32 {
     }
 }
 
-pub fn reduce_whitespace(s: &str) -> CompactString {
-    s.split_whitespace()
-        .collect::<Vec<&str>>()
-        .join(" ")
-        .to_compact_string()
+pub fn reduce_whitespace(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
 // we need to have this split into a separate function, so that thread_rng is dropped before the
