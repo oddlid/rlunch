@@ -121,10 +121,13 @@ async fn handle_result(
         res = res_rx.recv() => match res {
             Some(v) => match v {
                 Ok(v) => {
-                    debug!(%v.site_id, "Got scrape result, updating DB...");
+                    // we need to copy the id, since update_site will consume v
+                    let site_id = v.site_id;
+                    debug!(%site_id, "Got scrape result, updating DB...");
                     if let Err(e) = db::update_site(pg, v).await {
                         error!(err = %e, "Failed to update DB");
                     }
+                    debug!(%site_id, "DB update done");
                 },
                 Err(e) => {
                     error!(err = %e, "Scraping failed");

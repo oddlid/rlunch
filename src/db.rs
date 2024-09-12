@@ -54,6 +54,17 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
         .execute(&mut *tx)
         .await?;
 
+    // These loops will create a lot of round trips to the DB, and probably be quite slow and
+    // inefficient. So it would be good to optimize this in some way, but I just don't know how,
+    // yet.
+    // From looking at the logs, it seems an insert of 11 restaurants with a total of 56 dishes
+    // takes about 400ms. Not a huge problem given that the DB should be updated in the background,
+    // but I think there's room for plenty of improvement.
+    // One possibility could be to use the full structs from models in the scrapers, so we generate
+    // the uuids and relations in code rather than in the DB. Then it might be possible to use
+    // UNNEST here and get fewer round trips by sort of flattening the queries.
+    // TODO: have a look at postgres UNNEST()
+    // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
     for r in update.restaurants {
         let r_id = sqlx::query_scalar!(
             r#"
@@ -69,7 +80,7 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
             r.map_url,
             r.parsed_at,
         )
-        .fetch_one(pg)
+        .fetch_one(&mut *tx)
         .await?;
 
         for d in r.dishes {
@@ -85,7 +96,7 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
                 &d.tags[..],
                 d.price,
             )
-            .execute(pg)
+            .execute(&mut *tx)
             .await?;
         }
     }

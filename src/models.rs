@@ -70,6 +70,13 @@ impl Dish {
             ..Default::default()
         }
     }
+
+    pub fn for_restaurant(self, restaurant_id: Uuid) -> Self {
+        Self {
+            restaurant_id,
+            ..self
+        }
+    }
 }
 
 impl From<api::Dish> for Dish {
@@ -121,6 +128,15 @@ impl Restaurant {
         Self {
             name: name.into(),
             parsed_at: Local::now(),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_for_site(name: &str, site_id: Uuid) -> Self {
+        Self {
+            name: name.into(),
+            parsed_at: Local::now(),
+            site_id,
             ..Default::default()
         }
     }
