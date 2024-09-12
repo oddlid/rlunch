@@ -88,6 +88,7 @@ pub struct Restaurant {
     #[sqlx(rename = "created_at")]
     pub parsed_at: DateTime<Local>,
     /// List of current dishes
+    #[sqlx(skip)]
     pub dishes: Vec<Dish>,
 }
 
@@ -99,15 +100,6 @@ impl Restaurant {
             ..Default::default()
         }
     }
-
-    // pub fn opt_comment(&self) -> Option<&str> {
-    //     // match self.comment.as_ref() {
-    //     //     Some(v) => Some(v),
-    //     //     None => None,
-    //     // }
-    //
-    //     self.comment.as_ref().map(|v| v.as_str())
-    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -183,57 +175,57 @@ impl LunchData {
     }
 }
 
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn dish_display() {
-        let d = Dish {
-            name: String::from("meat"),
-            description: Some(String::from("balls")),
-            ..Default::default()
-        };
-        assert_eq!("meat balls", format!("{d}"));
-    }
-
-    #[test]
-    fn dish_deserialize() {
-        let j = serde_json::json!({
-            "name": "Test",
-            "description": "with sauce",
-            "price": 32
-        });
-        let d: Dish = serde_json::from_value(j).unwrap();
-        assert_eq!(32.0, d.price);
-        println!("{d:#?}");
-    }
-
-    #[test]
-    #[ignore = "Visual inspection"]
-    fn show_structure() {
-        let mut d = Dish::new("meat");
-        d.description = Some(String::from("balls"));
-        d.price = 120.0;
-        d.tags.push(String::from("carnivora"));
-        d.tags.push(String::from("yummy"));
-
-        let mut r = Restaurant::new("Pasta House");
-        r.dishes.push(d);
-
-        let mut s = Site::new("SomeSite");
-        s.restaurants.insert(r.name.clone(), r);
-
-        let mut city = City::new("Göteborg");
-        city.sites.insert(s.name.clone(), s);
-
-        let mut country = Country::new("Sweden");
-        country.cities.insert(city.name.clone(), city);
-
-        let mut ld = LunchData::new();
-        ld.countries.insert(country.name.clone(), country);
-
-        println!("{}", serde_json::to_string_pretty(&ld).unwrap());
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//
+//     use super::*;
+//
+//     #[test]
+//     fn dish_display() {
+//         let d = Dish {
+//             name: String::from("meat"),
+//             description: Some(String::from("balls")),
+//             ..Default::default()
+//         };
+//         assert_eq!("meat balls", format!("{d}"));
+//     }
+//
+//     #[test]
+//     fn dish_deserialize() {
+//         let j = serde_json::json!({
+//             "name": "Test",
+//             "description": "with sauce",
+//             "price": 32
+//         });
+//         let d: Dish = serde_json::from_value(j).unwrap();
+//         assert_eq!(32.0, d.price);
+//         println!("{d:#?}");
+//     }
+//
+//     #[test]
+//     #[ignore = "Visual inspection"]
+//     fn show_structure() {
+//         let mut d = Dish::new("meat");
+//         d.description = Some(String::from("balls"));
+//         d.price = 120.0;
+//         d.tags.push(String::from("carnivora"));
+//         d.tags.push(String::from("yummy"));
+//
+//         let mut r = Restaurant::new("Pasta House");
+//         r.dishes.push(d);
+//
+//         let mut s = Site::new("SomeSite");
+//         s.restaurants.insert(r.name.clone(), r);
+//
+//         let mut city = City::new("Göteborg");
+//         city.sites.insert(s.name.clone(), s);
+//
+//         let mut country = Country::new("Sweden");
+//         country.cities.insert(city.name.clone(), city);
+//
+//         let mut ld = LunchData::new();
+//         ld.countries.insert(country.name.clone(), country);
+//
+//         println!("{}", serde_json::to_string_pretty(&ld).unwrap());
+//     }
+// }

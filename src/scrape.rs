@@ -1,4 +1,4 @@
-use crate::{data, db, scrapers};
+use crate::{db, models::api, scrapers};
 use anyhow::{anyhow, Result};
 use compact_str::CompactString;
 use reqwest::{Client, IntoUrl};
@@ -27,7 +27,7 @@ pub trait RestaurantScraper {
 #[derive(Debug, Clone)]
 pub struct ScrapeResult {
     pub site_id: Uuid,
-    pub restaurants: Vec<data::Restaurant>,
+    pub restaurants: Vec<api::Restaurant>,
 }
 
 #[derive(Debug, Clone)]

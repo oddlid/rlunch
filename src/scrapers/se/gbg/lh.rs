@@ -1,5 +1,5 @@
 use crate::{
-    data::{Dish, Restaurant},
+    models::api::{Dish, Restaurant},
     scrape::{get, get_client, RestaurantScraper, ScrapeResult},
     util::*,
 };
@@ -155,10 +155,10 @@ impl RestaurantScraper for LHScraper {
                             if cur_restaurant_name.is_empty() {
                                 continue;
                             }
-                            let entry = restaurants
+                            let restaurant = restaurants
                                 .entry(get_restaurant_link(&cur_restaurant_name))
                                 .or_insert_with(|| Restaurant::new(&cur_restaurant_name));
-                            entry.dishes.push(d);
+                            restaurant.dishes.push(d);
                         }
                     }
                 }

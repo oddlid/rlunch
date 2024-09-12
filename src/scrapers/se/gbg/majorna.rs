@@ -1,7 +1,7 @@
 // Currently just a dummy implementation to see how it all works with several scrapers
 
 use crate::{
-    data::{Dish, Restaurant},
+    models::api::{Dish, Restaurant},
     scrape::{RestaurantScraper, ScrapeResult},
 };
 use anyhow::Result;
