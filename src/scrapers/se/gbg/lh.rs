@@ -1,5 +1,5 @@
 use crate::{
-    models::api::{Dish, Restaurant},
+    models::{Dish, Restaurant},
     scrape::{get, get_client, RestaurantScraper, ScrapeResult},
     util::*,
 };
@@ -157,8 +157,12 @@ impl RestaurantScraper for LHScraper {
                             }
                             let restaurant = restaurants
                                 .entry(get_restaurant_link(&cur_restaurant_name))
-                                .or_insert_with(|| Restaurant::new(&cur_restaurant_name));
-                            restaurant.dishes.push(d);
+                                .or_insert_with(|| {
+                                    Restaurant::new_for_site(&cur_restaurant_name, self.site_id)
+                                });
+                            restaurant
+                                .dishes
+                                .insert(d.dish_id, d.for_restaurant(restaurant.restaurant_id));
                         }
                     }
                 }
@@ -189,6 +193,7 @@ fn parse_dish(e: &ElementRef) -> Option<Dish> {
         Some(v) => parse_float(v.trim()),
     };
     let mut dish = Dish {
+        dish_id: Uuid::new_v4(),
         name: name?,
         description,
         price,

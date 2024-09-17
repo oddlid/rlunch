@@ -40,6 +40,12 @@ impl<T> DerefMut for UuidMap<T> {
     }
 }
 
+impl<T> UuidMap<T> {
+    pub fn into_vec(mut self) -> Vec<T> {
+        self.drain().map(|(_, v)| v).collect()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
 #[sqlx(default)]
@@ -66,6 +72,7 @@ pub struct Dish {
 impl Dish {
     pub fn new(name: &str) -> Self {
         Self {
+            dish_id: Uuid::new_v4(),
             name: name.into(),
             ..Default::default()
         }
@@ -91,6 +98,80 @@ impl From<api::Dish> for Dish {
         }
     }
 }
+
+/// DishRows maps a list of Dish into lists of all its fields.
+/// The intended use is together with Postgres' UNNEST, to be able to do batch insert of many
+/// Dishes.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DishRows {
+    pub dish_ids: Vec<Uuid>,
+    pub restaurant_ids: Vec<Uuid>,
+    pub names: Vec<String>,
+    pub descriptions: Vec<Option<String>>,
+    pub comments: Vec<Option<String>>,
+    pub tags: Vec<Vec<String>>,
+    pub prices: Vec<f32>,
+}
+
+impl DishRows {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            dish_ids: Vec::with_capacity(cap),
+            restaurant_ids: Vec::with_capacity(cap),
+            names: Vec::with_capacity(cap),
+            descriptions: Vec::with_capacity(cap),
+            comments: Vec::with_capacity(cap),
+            tags: Vec::with_capacity(cap),
+            prices: Vec::with_capacity(cap),
+        }
+    }
+
+    fn extend(&mut self, other: DishRows) {
+        self.dish_ids.extend(other.dish_ids);
+        self.restaurant_ids.extend(other.restaurant_ids);
+        self.names.extend(other.names);
+        self.descriptions.extend(other.descriptions);
+        self.comments.extend(other.comments);
+        self.tags.extend(other.tags);
+        self.prices.extend(other.prices);
+    }
+}
+
+impl From<UuidMap<Dish>> for DishRows {
+    fn from(mut m: UuidMap<Dish>) -> Self {
+        let mut dr = Self::with_capacity(m.len());
+
+        for (_, v) in m.drain() {
+            dr.dish_ids.push(v.dish_id);
+            dr.restaurant_ids.push(v.restaurant_id);
+            dr.names.push(v.name);
+            dr.descriptions.push(v.description);
+            dr.comments.push(v.comment);
+            dr.tags.push(v.tags);
+            dr.prices.push(v.price);
+        }
+
+        dr
+    }
+}
+
+// impl From<Vec<Dish>> for DishRows {
+//     fn from(v: Vec<Dish>) -> Self {
+//         let mut dr = Self::with_capacity(v.len());
+//
+//         for d in v {
+//             dr.dish_ids.push(d.dish_id);
+//             dr.restaurant_ids.push(d.restaurant_id);
+//             dr.names.push(d.name);
+//             dr.descriptions.push(d.description);
+//             dr.comments.push(d.comment);
+//             dr.tags.push(d.tags);
+//             dr.prices.push(d.price);
+//         }
+//
+//         dr
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
@@ -126,6 +207,7 @@ pub struct Restaurant {
 impl Restaurant {
     pub fn new(name: &str) -> Self {
         Self {
+            restaurant_id: Uuid::new_v4(),
             name: name.into(),
             parsed_at: Local::now(),
             ..Default::default()
@@ -134,6 +216,7 @@ impl Restaurant {
 
     pub fn new_for_site(name: &str, site_id: Uuid) -> Self {
         Self {
+            restaurant_id: Uuid::new_v4(),
             name: name.into(),
             parsed_at: Local::now(),
             site_id,
@@ -162,6 +245,76 @@ impl From<api::Restaurant> for Restaurant {
             dishes: restaurant.dishes.into(),
             ..Default::default()
         }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RestaurantRows {
+    pub restaurant_ids: Vec<Uuid>,
+    pub site_ids: Vec<Uuid>,
+    pub names: Vec<String>,
+    pub comments: Vec<Option<String>>,
+    pub addresses: Vec<Option<String>>,
+    pub urls: Vec<Option<String>>,
+    pub map_urls: Vec<Option<String>>,
+    pub parsed_ats: Vec<DateTime<Local>>,
+    pub dishes: DishRows,
+}
+
+impl RestaurantRows {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            restaurant_ids: Vec::with_capacity(cap),
+            site_ids: Vec::with_capacity(cap),
+            names: Vec::with_capacity(cap),
+            comments: Vec::with_capacity(cap),
+            addresses: Vec::with_capacity(cap),
+            urls: Vec::with_capacity(cap),
+            map_urls: Vec::with_capacity(cap),
+            parsed_ats: Vec::with_capacity(cap),
+            dishes: DishRows::with_capacity(cap), // might be good to use a larger size here
+        }
+    }
+}
+
+// might not need this impl
+// impl From<UuidMap<Restaurant>> for RestaurantRows {
+//     fn from(mut m: UuidMap<Restaurant>) -> Self {
+//         let mut rr = Self::with_capacity(m.len());
+//
+//         for (_, v) in m.drain() {
+//             rr.restaurant_ids.push(v.restaurant_id);
+//             rr.site_ids.push(v.site_id);
+//             rr.names.push(v.name);
+//             rr.comments.push(v.comment);
+//             rr.addresses.push(v.address);
+//             rr.urls.push(v.url);
+//             rr.map_urls.push(v.map_url);
+//             rr.parsed_ats.push(v.parsed_at);
+//             rr.dishes.push(v.dishes.into());
+//         }
+//
+//         rr
+//     }
+// }
+
+impl From<Vec<Restaurant>> for RestaurantRows {
+    fn from(v: Vec<Restaurant>) -> Self {
+        let mut rr = Self::with_capacity(v.len());
+
+        for r in v {
+            rr.restaurant_ids.push(r.restaurant_id);
+            rr.site_ids.push(r.site_id);
+            rr.names.push(r.name);
+            rr.comments.push(r.comment);
+            rr.addresses.push(r.address);
+            rr.urls.push(r.url);
+            rr.map_urls.push(r.map_url);
+            rr.parsed_ats.push(r.parsed_at);
+            rr.dishes.extend(r.dishes.into());
+        }
+
+        rr
     }
 }
 

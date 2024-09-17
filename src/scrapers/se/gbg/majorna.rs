@@ -1,7 +1,7 @@
 // Currently just a dummy implementation to see how it all works with several scrapers
 
 use crate::{
-    models::api::{Dish, Restaurant},
+    models::{Dish, Restaurant},
     scrape::{RestaurantScraper, ScrapeResult},
 };
 use anyhow::Result;
@@ -34,37 +34,50 @@ impl RestaurantScraper for MajornaScraper {
         trace!(?self.request_delay, "Faking taking time to do work...");
         tokio::time::sleep(self.request_delay).await;
 
-        // if rand::random() {
-        //     bail!("{}: Randomly generated error", self.name());
-        // }
+        let mut r = Restaurant {
+            site_id: self.site_id,
+            restaurant_id: Uuid::new_v4(),
+            name: String::from("Old Town"),
+            comment: Some(String::from("Second home")),
+            address: Some(String::from("Godhemsgatan 7, 414 68 Göteborg")),
+            url: Some(String::from("https://www.oldtown.se/")),
+            map_url: Some(String::from(
+                "https://www.google.se/maps/place/Godhemsgatan+7,+414+68+G%C3%B6teborg",
+            )),
+            parsed_at: Local::now(),
+            ..Default::default()
+        };
+
+        let id = Uuid::new_v4();
+        r.dishes.insert(
+            id,
+            Dish {
+                dish_id: id,
+                restaurant_id: r.restaurant_id,
+                name: String::from("Grekiskt"),
+                description: Some(String::from("med stor stark")),
+                comment: Some(String::from("kan innehålla grävling")),
+                tags: Vec::new(),
+                price: 149.0,
+            },
+        );
+        let id = Uuid::new_v4();
+        r.dishes.insert(
+            id,
+            Dish {
+                dish_id: id,
+                restaurant_id: r.restaurant_id,
+                name: String::from("Pizza"),
+                description: Some(String::from("med saker")),
+                comment: Some(String::from("kan innehålla rotta")),
+                tags: Vec::new(),
+                price: 89.0,
+            },
+        );
+
         Ok(ScrapeResult {
             site_id: self.site_id,
-            restaurants: vec![Restaurant {
-                name: String::from("Old Town"),
-                comment: Some(String::from("Second home")),
-                address: Some(String::from("Godhemsgatan 7, 414 68 Göteborg")),
-                url: Some(String::from("https://www.oldtown.se/")),
-                map_url: Some(String::from(
-                    "https://www.google.se/maps/place/Godhemsgatan+7,+414+68+G%C3%B6teborg",
-                )),
-                parsed_at: Local::now(),
-                dishes: vec![
-                    Dish {
-                        name: String::from("Grekiskt"),
-                        description: Some(String::from("med stor stark")),
-                        comment: Some(String::from("kan innehålla grävling")),
-                        tags: Vec::new(),
-                        price: 149.0,
-                    },
-                    Dish {
-                        name: String::from("Pizza"),
-                        description: Some(String::from("med saker")),
-                        comment: Some(String::from("kan innehålla rotta")),
-                        tags: Vec::new(),
-                        price: 89.0,
-                    },
-                ],
-            }],
+            restaurants: vec![r],
         })
     }
 }

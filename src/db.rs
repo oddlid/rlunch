@@ -1,5 +1,6 @@
-use crate::scrape::ScrapeResult;
+use crate::{models::RestaurantRows, scrape::ScrapeResult};
 use anyhow::{Error, Result};
+use chrono::{DateTime, Local};
 use sqlx::PgPool;
 use tracing::trace;
 use uuid::Uuid;
@@ -46,6 +47,13 @@ pub async fn get_site_uuid(pg: &PgPool, key: SiteKey<'_>) -> Result<Uuid> {
 }
 
 pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
+    // // let site_id = update.site_id;
+    let rs = RestaurantRows::from(update.restaurants);
+
+    // println!("{:?}", rs);
+    //
+    // Ok(())
+
     let mut tx = pg.begin().await?;
 
     // first, clear out all restaurants and their dishes, so that we don't have any stale data
@@ -65,41 +73,75 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     // UNNEST here and get fewer round trips by sort of flattening the queries.
     // TODO: have a look at postgres UNNEST()
     // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
-    for r in update.restaurants {
-        let r_id = sqlx::query_scalar!(
-            r#"
-                insert into restaurant (site_id, restaurant_name, comment, address, url, map_url, created_at)
-                values ($1, $2, $3, $4, $5, $6, $7)
-                returning restaurant_id;
-            "#,
-            update.site_id,
-            r.name,
-            r.comment,
-            r.address,
-            r.url,
-            r.map_url,
-            r.parsed_at,
-        )
-        .fetch_one(&mut *tx)
-        .await?;
+    //
+    // for r in update.restaurants {
+    //     let r_id = sqlx::query_scalar!(
+    //         r#"
+    //             insert into restaurant (site_id, restaurant_name, comment, address, url, map_url, created_at)
+    //             values ($1, $2, $3, $4, $5, $6, $7)
+    //             returning restaurant_id;
+    //         "#,
+    //         update.site_id,
+    //         r.name,
+    //         r.comment,
+    //         r.address,
+    //         r.url,
+    //         r.map_url,
+    //         r.parsed_at,
+    //     )
+    //     .fetch_one(&mut *tx)
+    //     .await?;
+    //
+    //     for d in r.dishes {
+    //         sqlx::query!(
+    //             r#"
+    //                 insert into dish (restaurant_id, dish_name, description, comment, tags, price)
+    //                 values ($1, $2, $3, $4, $5, $6);
+    //             "#,
+    //             r_id,
+    //             d.name,
+    //             d.description,
+    //             d.comment,
+    //             &d.tags[..],
+    //             d.price,
+    //         )
+    //         .execute(&mut *tx)
+    //         .await?;
+    //     }
+    // }
 
-        for d in r.dishes {
-            sqlx::query!(
-                r#"
-                    insert into dish (restaurant_id, dish_name, description, comment, tags, price)
-                    values ($1, $2, $3, $4, $5, $6);
-                "#,
-                r_id,
-                d.name,
-                d.description,
-                d.comment,
-                &d.tags[..],
-                d.price,
-            )
-            .execute(&mut *tx)
-            .await?;
-        }
-    }
+    // tx.commit().await.map_err(Error::from)
+
+    sqlx::query!(
+        r#"
+            insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at)
+            select * from    unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::timestamptz[])
+        "#,
+        &rs.site_ids[..],
+        &rs.restaurant_ids[..],
+        &rs.names[..],
+        &rs.comments as &[Option<String>],
+        &rs.addresses as &[Option<String>],
+        &rs.urls as &[Option<String>],
+        &rs.map_urls as &[Option<String>],
+        &rs.parsed_ats[..],
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        r#"
+            insert into dish (restaurant_id, dish_id, dish_name, description, comment, price)
+            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[])
+        "#,
+        &rs.dishes.restaurant_ids[..],
+        &rs.dishes.dish_ids[..],
+        &rs.dishes.names[..],
+        &rs.dishes.descriptions as &[Option<String>],
+        &rs.dishes.comments as &[Option<String>],
+        &rs.dishes.prices[..],
+        // &rs.dishes.tags[..], // TODO: find out how to insert vec of vec with unnest
+    ).execute(&mut *tx).await?;
 
     tx.commit().await.map_err(Error::from)
 }
