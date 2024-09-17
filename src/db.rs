@@ -131,8 +131,8 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
 
     sqlx::query!(
         r#"
-            insert into dish (restaurant_id, dish_id, dish_name, description, comment, price)
-            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[])
+            insert into dish (restaurant_id, dish_id, dish_name, description, comment, price, tags)
+            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[]), unnest_nd_1d($7::text[])
         "#,
         &rs.dishes.restaurant_ids[..],
         &rs.dishes.dish_ids[..],
@@ -140,7 +140,7 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
         &rs.dishes.descriptions as &[Option<String>],
         &rs.dishes.comments as &[Option<String>],
         &rs.dishes.prices[..],
-        // &rs.dishes.tags[..], // TODO: find out how to insert vec of vec with unnest
+        &rs.dishes.tags[..],
     ).execute(&mut *tx).await?;
 
     tx.commit().await.map_err(Error::from)

@@ -25,3 +25,22 @@ $$ language plpgsql;
 -- Finally, this is a text collation that sorts text case-insensitively, useful for `UNIQUE` indexes
 -- over things like usernames and emails, without needing to remember to do case-conversion.
 -- create collation case_insensitive (provider = icu, locale = 'und-u-ks-level2', deterministic = false);
+
+-- Function to unnest but keep the inner arrays of tags
+-- Taken from: https://dbfiddle.uk/3cD1er77
+-- unnest Nd array to 1d arrays (LANGUAGE plpgsql)
+CREATE OR REPLACE FUNCTION unnest_nd_1d(a anyarray, OUT a_1d anyarray)
+  RETURNS SETOF anyarray
+  LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE STRICT AS
+$func$
+BEGIN                -- null is covered by STRICT
+   IF a = '{}' THEN  -- empty
+      a_1d = '{}';
+      RETURN NEXT;
+   ELSE              --  all other cases
+      FOREACH a_1d SLICE 1 IN ARRAY a LOOP
+         RETURN NEXT;
+      END LOOP;
+   END IF;
+END
+$func$
