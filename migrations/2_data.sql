@@ -56,6 +56,7 @@ create table dish
   dish_name text not null,
   description text,
   comment text,
+  -- tags should be csv, as using an array turned out to be too cumbersome
   tags text,
   price float(4),
   created_at timestamptz not null default now(),

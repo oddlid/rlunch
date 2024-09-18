@@ -41,8 +41,8 @@ impl<T> DerefMut for UuidMap<T> {
 }
 
 impl<T> UuidMap<T> {
-    pub fn into_vec(mut self) -> Vec<T> {
-        self.drain().map(|(_, v)| v).collect()
+    pub fn into_vec<U: std::convert::From<T>>(mut self) -> Vec<U> {
+        self.drain().map(|(_, v)| v.into()).collect()
     }
 }
 
@@ -316,6 +316,18 @@ impl Site {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
+pub struct SiteWithCurrency {
+    #[serde(skip_serializing)]
+    pub country_id: Uuid,
+    #[serde(skip_serializing)]
+    pub city_id: Uuid,
+    pub site: Site,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency_suffix: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
 #[sqlx(default)]
@@ -470,7 +482,7 @@ pub mod api {
     }
 
     impl From<super::Restaurant> for Restaurant {
-        fn from(mut restaurant: super::Restaurant) -> Self {
+        fn from(restaurant: super::Restaurant) -> Self {
             Self {
                 name: restaurant.name,
                 comment: restaurant.comment,
@@ -478,7 +490,7 @@ pub mod api {
                 url: restaurant.url,
                 map_url: restaurant.map_url,
                 parsed_at: restaurant.parsed_at,
-                dishes: restaurant.dishes.drain().map(|(_, v)| v.into()).collect(),
+                dishes: restaurant.dishes.into_vec(),
             }
         }
     }
@@ -502,6 +514,17 @@ pub mod api {
         }
     }
 
+    impl From<super::Site> for Site {
+        fn from(s: super::Site) -> Self {
+            Self {
+                name: s.name,
+                url_id: s.url_id,
+                comment: s.comment,
+                restaurants: s.restaurants.into_vec(),
+            }
+        }
+    }
+
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct City {
@@ -515,6 +538,16 @@ pub mod api {
             Self {
                 name: name.into(),
                 ..Default::default()
+            }
+        }
+    }
+
+    impl From<super::City> for City {
+        fn from(c: super::City) -> Self {
+            Self {
+                name: c.name,
+                url_id: c.url_id,
+                sites: c.sites.into_vec(),
             }
         }
     }
@@ -538,6 +571,17 @@ pub mod api {
         }
     }
 
+    impl From<super::Country> for Country {
+        fn from(c: super::Country) -> Self {
+            Self {
+                name: c.name,
+                url_id: c.url_id,
+                currency_suffix: c.currency_suffix,
+                cities: c.cities.into_vec(),
+            }
+        }
+    }
+
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct LunchData {
@@ -548,6 +592,14 @@ pub mod api {
     impl LunchData {
         pub fn new() -> Self {
             Default::default()
+        }
+    }
+
+    impl From<super::LunchData> for LunchData {
+        fn from(l: super::LunchData) -> Self {
+            Self {
+                countries: l.countries.into_vec(),
+            }
         }
     }
 }

@@ -193,7 +193,7 @@ fn parse_dish(e: &ElementRef) -> Option<Dish> {
         Some(v) => parse_float(v.trim()),
     };
     let mut dish = Dish {
-        dish_id: Uuid::new_v4(),
+        dish_id: Uuid::new_v4(), // very important when creating a Dish manually!
         name: name?,
         description,
         price,

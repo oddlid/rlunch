@@ -1,4 +1,7 @@
-use crate::{models::RestaurantRows, scrape::ScrapeResult};
+use crate::{
+    models::{RestaurantRows, SiteWithCurrency},
+    scrape::ScrapeResult,
+};
 use anyhow::{Error, Result};
 use sqlx::PgPool;
 use std::time::Instant;
@@ -46,6 +49,10 @@ pub async fn get_site_uuid(pg: &PgPool, key: SiteKey<'_>) -> Result<Uuid> {
     Ok(id)
 }
 
+pub async fn get_site_by_id(pg: &PgPool, id: Uuid) -> Result<SiteWithCurrency> {
+    todo!("implement")
+}
+
 pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
 
@@ -55,11 +62,13 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     let duration = start.elapsed();
     trace!("Conversion to DB format done in {:?}", duration);
 
+    // we need a transaction to ensure these operations are done atomically
     let mut tx = pg.begin().await?;
 
     let start = Instant::now();
     // first, clear out all restaurants and their dishes, so that we don't have any stale data
-    // lingering
+    // lingering. We have "on delete cascade" for dishes, so we just need to delete the parent
+    // restaurants to get rid of all.
     sqlx::query!("delete from restaurant where site_id = $1", update.site_id)
         .execute(&mut *tx)
         .await?;
@@ -68,7 +77,7 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     sqlx::query!(
         r#"
             insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at)
-            select * from    unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::timestamptz[])
+            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::timestamptz[])
         "#,
         &rs.site_ids[..],
         &rs.restaurant_ids[..],
