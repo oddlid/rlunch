@@ -109,7 +109,7 @@ pub struct DishRows {
     pub names: Vec<String>,
     pub descriptions: Vec<Option<String>>,
     pub comments: Vec<Option<String>>,
-    pub tags: Vec<Vec<String>>,
+    pub tags: Vec<String>, // comma separated list
     pub prices: Vec<f32>,
 }
 
@@ -147,31 +147,13 @@ impl From<UuidMap<Dish>> for DishRows {
             dr.names.push(v.name);
             dr.descriptions.push(v.description);
             dr.comments.push(v.comment);
-            dr.tags.push(v.tags);
+            dr.tags.push(v.tags.join(",")); // flatten the list to comma separated values
             dr.prices.push(v.price);
         }
 
         dr
     }
 }
-
-// impl From<Vec<Dish>> for DishRows {
-//     fn from(v: Vec<Dish>) -> Self {
-//         let mut dr = Self::with_capacity(v.len());
-//
-//         for d in v {
-//             dr.dish_ids.push(d.dish_id);
-//             dr.restaurant_ids.push(d.restaurant_id);
-//             dr.names.push(d.name);
-//             dr.descriptions.push(d.description);
-//             dr.comments.push(d.comment);
-//             dr.tags.push(d.tags);
-//             dr.prices.push(d.price);
-//         }
-//
-//         dr
-//     }
-// }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 #[serde(default)]
@@ -223,14 +205,6 @@ impl Restaurant {
             ..Default::default()
         }
     }
-
-    // pub fn add(&mut self, d: Dish) -> Option<Dish> {
-    //     self.dishes.insert(Uuid::new_v4(), d)
-    // }
-    //
-    // pub fn into_dishes(self) -> UuidMap<Dish> {
-    //     self.dishes
-    // }
 }
 
 impl From<api::Restaurant> for Restaurant {

@@ -1,7 +1,7 @@
 use crate::{models::RestaurantRows, scrape::ScrapeResult};
 use anyhow::{Error, Result};
-use chrono::{DateTime, Local};
 use sqlx::PgPool;
+use std::time::Instant;
 use tracing::trace;
 use uuid::Uuid;
 
@@ -47,71 +47,24 @@ pub async fn get_site_uuid(pg: &PgPool, key: SiteKey<'_>) -> Result<Uuid> {
 }
 
 pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
-    // // let site_id = update.site_id;
-    let rs = RestaurantRows::from(update.restaurants);
+    trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
 
-    // println!("{:?}", rs);
-    //
-    // Ok(())
+    let start = Instant::now();
+    // convert to format suitable for use with unnest
+    let rs = RestaurantRows::from(update.restaurants);
+    let duration = start.elapsed();
+    trace!("Conversion to DB format done in {:?}", duration);
 
     let mut tx = pg.begin().await?;
 
+    let start = Instant::now();
     // first, clear out all restaurants and their dishes, so that we don't have any stale data
     // lingering
     sqlx::query!("delete from restaurant where site_id = $1", update.site_id)
         .execute(&mut *tx)
         .await?;
 
-    // These loops will create a lot of round trips to the DB, and probably be quite slow and
-    // inefficient. So it would be good to optimize this in some way, but I just don't know how,
-    // yet.
-    // From looking at the logs, it seems an insert of 11 restaurants with a total of 56 dishes
-    // takes about 400ms. Not a huge problem given that the DB should be updated in the background,
-    // but I think there's room for plenty of improvement.
-    // One possibility could be to use the full structs from models in the scrapers, so we generate
-    // the uuids and relations in code rather than in the DB. Then it might be possible to use
-    // UNNEST here and get fewer round trips by sort of flattening the queries.
-    // TODO: have a look at postgres UNNEST()
-    // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
-    //
-    // for r in update.restaurants {
-    //     let r_id = sqlx::query_scalar!(
-    //         r#"
-    //             insert into restaurant (site_id, restaurant_name, comment, address, url, map_url, created_at)
-    //             values ($1, $2, $3, $4, $5, $6, $7)
-    //             returning restaurant_id;
-    //         "#,
-    //         update.site_id,
-    //         r.name,
-    //         r.comment,
-    //         r.address,
-    //         r.url,
-    //         r.map_url,
-    //         r.parsed_at,
-    //     )
-    //     .fetch_one(&mut *tx)
-    //     .await?;
-    //
-    //     for d in r.dishes {
-    //         sqlx::query!(
-    //             r#"
-    //                 insert into dish (restaurant_id, dish_name, description, comment, tags, price)
-    //                 values ($1, $2, $3, $4, $5, $6);
-    //             "#,
-    //             r_id,
-    //             d.name,
-    //             d.description,
-    //             d.comment,
-    //             &d.tags[..],
-    //             d.price,
-    //         )
-    //         .execute(&mut *tx)
-    //         .await?;
-    //     }
-    // }
-
-    // tx.commit().await.map_err(Error::from)
-
+    // insert all restaurants
     sqlx::query!(
         r#"
             insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at)
@@ -129,10 +82,11 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     .execute(&mut *tx)
     .await?;
 
+    // insert all dishes
     sqlx::query!(
         r#"
             insert into dish (restaurant_id, dish_id, dish_name, description, comment, price, tags)
-            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[]), unnest_nd_1d($7::text[])
+            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[], $7::text[])
         "#,
         &rs.dishes.restaurant_ids[..],
         &rs.dishes.dish_ids[..],
@@ -142,6 +96,9 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
         &rs.dishes.prices[..],
         &rs.dishes.tags[..],
     ).execute(&mut *tx).await?;
+    let duration = start.elapsed();
+
+    trace!("DB update done in {:?}", duration);
 
     tx.commit().await.map_err(Error::from)
 }

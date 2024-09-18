@@ -30,6 +30,20 @@ pub struct ScrapeResult {
     pub restaurants: Vec<models::Restaurant>,
 }
 
+impl ScrapeResult {
+    pub fn num_restaurants(&self) -> usize {
+        self.restaurants.len()
+    }
+
+    pub fn num_dishes(&self) -> usize {
+        let mut sum: usize = 0;
+        for r in &self.restaurants {
+            sum += r.dishes.len();
+        }
+        sum
+    }
+}
+
 #[derive(Debug, Clone)]
 enum ScrapeCommand {
     Run,
@@ -127,7 +141,7 @@ async fn handle_result(
                     if let Err(e) = db::update_site(pg, v).await {
                         error!(err = %e, "Failed to update DB");
                     }
-                    debug!(%site_id, "DB update done");
+                    debug!(%site_id, "DB update OK");
                 },
                 Err(e) => {
                     error!(err = %e, "Scraping failed");

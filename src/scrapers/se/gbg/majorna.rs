@@ -57,7 +57,7 @@ impl RestaurantScraper for MajornaScraper {
                 name: String::from("Grekiskt"),
                 description: Some(String::from("med stor stark")),
                 comment: Some(String::from("kan innehålla grävling")),
-                tags: Vec::new(),
+                tags: ["kött", "gris"].map(String::from).to_vec(),
                 price: 149.0,
             },
         );
