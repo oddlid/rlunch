@@ -1,4 +1,3 @@
-// This module might replace some of the stuff I first put in data.
 // The structs in this module are a direct mapping of the DB structure,
 // while the structs in the api sub-module are stripped versions of those intended for use in API
 // output, and similar, where uuids and mappings are not needed.
@@ -304,6 +303,7 @@ pub struct Site {
     pub url_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    #[sqlx(skip)]
     pub restaurants: UuidMap<Restaurant>,
 }
 

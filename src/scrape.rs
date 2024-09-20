@@ -212,9 +212,12 @@ async fn setup_scrapers(
     results: mpsc::Sender<Result<ScrapeResult>>,
 ) -> Result<task::JoinSet<()>> {
     let mut set = task::JoinSet::new();
+
     set.spawn(run_scraper(
         scrapers::se::gbg::lh::LHScraper::new(
-            db::get_site_uuid(pg, db::SiteKey::new("se", "gbg", "lh")).await?,
+            db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "lh"))
+                .await?
+                .site_id,
             request_delay,
         ),
         cmds.subscribe(),
@@ -222,7 +225,9 @@ async fn setup_scrapers(
     ));
     set.spawn(run_scraper(
         scrapers::se::gbg::majorna::MajornaScraper::new(
-            db::get_site_uuid(pg, db::SiteKey::new("se", "gbg", "maj")).await?,
+            db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "maj"))
+                .await?
+                .site_id,
             request_delay,
         ),
         cmds.subscribe(),
