@@ -5,6 +5,12 @@
 // uuids.
 // This means to possibly write some repeated SQL instead of reusing smaller functions, unless the
 // smaller functions can work within a transaction.
+//
+// Many functions here have a lot of round trips to the DB in order to construct nested structs.
+// It would be very good to cut down on those round trips, but I just don't know how to do that in
+// a good way in SQL. The attempts I've made with CTEs have been bloated by all parent data for a
+// dish to be repeated for every row, and I guess that's about as bad as having several round trips.
+// If anyone ever reads this and have an idea of how to do this, I'd be happy to hear it!
 
 use crate::{
     models::{City, Country, Dish, LunchData, Restaurant, RestaurantRows, Site},
@@ -68,7 +74,230 @@ where
     Ok(rel)
 }
 
-pub async fn get_site_by_id(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+pub async fn list_countries(pg: &PgPool) -> Result<LunchData> {
+    let countries: Vec<Country> = sqlx::query_as(
+        r#"
+            select * from country
+        "#,
+    )
+    .fetch_all(pg)
+    .await?;
+
+    let mut ld = LunchData::new();
+    for c in countries {
+        ld.countries.insert(c.country_id, c);
+    }
+
+    Ok(ld)
+}
+
+pub async fn list_cities(pg: &PgPool, country_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let mut country: Country = sqlx::query_as(
+        r#"
+            select * from country where country_id = $1
+        "#,
+    )
+    .bind(country_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let cities: Vec<City> = sqlx::query_as(
+        r#"
+            select * from city where country_id = $1
+        "#,
+    )
+    .bind(country_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.rollback().await?;
+
+    for c in cities {
+        country.cities.insert(c.city_id, c);
+    }
+
+    let mut ld = LunchData::new();
+    ld.countries.insert(country.country_id, country);
+
+    Ok(ld)
+}
+
+pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let mut city: City = sqlx::query_as(
+        r#"
+            select * from city where city_id = $1
+        "#,
+    )
+    .bind(city_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut country: Country = sqlx::query_as(
+        r#"
+            select * from country where country_id = $1
+        "#,
+    )
+    .bind(city.country_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let sites: Vec<Site> = sqlx::query_as(
+        r#"
+            select * from site where city_id = $1
+        "#,
+    )
+    .bind(city_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.rollback().await?;
+
+    for s in sites {
+        city.sites.insert(s.site_id, s);
+    }
+
+    country.cities.insert(city.city_id, city);
+    let mut ld = LunchData::new();
+    ld.countries.insert(country.country_id, country);
+
+    Ok(ld)
+}
+
+pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let mut site: Site = sqlx::query_as(
+        r#"
+            select * from site where site_id = $1
+        "#,
+    )
+    .bind(site_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut city: City = sqlx::query_as(
+        r#"
+            select * from city where city_id = $1
+        "#,
+    )
+    .bind(site.city_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut country: Country = sqlx::query_as(
+        r#"
+            select * from country where country_id = $1
+        "#,
+    )
+    .bind(city.country_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let restaurants: Vec<Restaurant> = sqlx::query_as(
+        r#"
+            select * from restaurant where site_id = $1
+        "#,
+    )
+    .bind(site.site_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.rollback().await?;
+
+    for r in restaurants {
+        site.restaurants.insert(r.restaurant_id, r);
+    }
+    city.sites.insert(site.site_id, site);
+    country.cities.insert(city.city_id, city);
+
+    let mut ld = LunchData::new();
+    ld.countries.insert(country.country_id, country);
+
+    Ok(ld)
+}
+
+pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let mut restaurant: Restaurant = sqlx::query_as(
+        r#"
+            select * from restaurant where restaurant_id = $1
+        "#,
+    )
+    .bind(restaurant_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut site: Site = sqlx::query_as(
+        r#"
+            select * from site where site_id = $1
+        "#,
+    )
+    .bind(restaurant.site_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut city: City = sqlx::query_as(
+        r#"
+            select * from city where city_id = $1
+        "#,
+    )
+    .bind(site.city_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut country: Country = sqlx::query_as(
+        r#"
+            select * from country where country_id = $1
+        "#,
+    )
+    .bind(city.country_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let dishes: Vec<Dish> = sqlx::query_as(
+        r#"
+            select
+                dish_id,
+                restaurant_id,
+                dish_name,
+                description,
+                comment,
+                string_to_array(tags, ',') as tags,
+                price,
+                created_at
+                from dish where restaurant_id = $1
+                group by dish_id
+        "#,
+    )
+    .bind(restaurant.restaurant_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.rollback().await?;
+
+    for d in dishes {
+        restaurant.dishes.insert(d.dish_id, d);
+    }
+    site.restaurants
+        .insert(restaurant.restaurant_id, restaurant);
+    city.sites.insert(site.site_id, site);
+    country.cities.insert(city.city_id, city);
+
+    let mut ld = LunchData::new();
+    ld.countries.insert(country.country_id, country);
+
+    Ok(ld)
+}
+
+pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+    // we use a transaction only to get a consistent view between several queries,
+    // as it could happen that an update comes in in between, deleting restaurants
+    // and dishes, rendering uuid fk references invalid.
     let mut tx = pg.begin().await?;
 
     let mut site = sqlx::query_as::<_, Site>(
@@ -130,7 +359,9 @@ pub async fn get_site_by_id(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
     .fetch_all(&mut *tx)
     .await?;
 
-    tx.commit().await?;
+    // since we haven't done any modifications in our queries,
+    // we just rollback now that we're done selecting
+    tx.rollback().await?;
 
     for r in restaurants {
         site.restaurants.insert(r.restaurant_id, r);
@@ -150,6 +381,10 @@ pub async fn get_site_by_id(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
 
     Ok(ld)
 }
+
+// I'm evaluating if I should write a "list_all" function as well, to get everything in the DB into a
+// LunchData instance, but that might be a bad idea if the DB gets big.
+// Let's wait and see of there's any need for it at some point.
 
 pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
     trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
