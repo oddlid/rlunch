@@ -250,27 +250,6 @@ impl RestaurantRows {
     }
 }
 
-// might not need this impl
-// impl From<UuidMap<Restaurant>> for RestaurantRows {
-//     fn from(mut m: UuidMap<Restaurant>) -> Self {
-//         let mut rr = Self::with_capacity(m.len());
-//
-//         for (_, v) in m.drain() {
-//             rr.restaurant_ids.push(v.restaurant_id);
-//             rr.site_ids.push(v.site_id);
-//             rr.names.push(v.name);
-//             rr.comments.push(v.comment);
-//             rr.addresses.push(v.address);
-//             rr.urls.push(v.url);
-//             rr.map_urls.push(v.map_url);
-//             rr.parsed_ats.push(v.parsed_at);
-//             rr.dishes.push(v.dishes.into());
-//         }
-//
-//         rr
-//     }
-// }
-
 impl From<Vec<Restaurant>> for RestaurantRows {
     fn from(v: Vec<Restaurant>) -> Self {
         let mut rr = Self::with_capacity(v.len());
@@ -314,18 +293,6 @@ impl Site {
             ..Default::default()
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-#[serde(default)]
-pub struct SiteWithCurrency {
-    #[serde(skip_serializing)]
-    pub country_id: Uuid,
-    #[serde(skip_serializing)]
-    pub city_id: Uuid,
-    pub site: Site,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub currency_suffix: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]

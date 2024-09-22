@@ -1,7 +1,9 @@
 use anyhow::Result;
 use compact_str::CompactString;
-use rlunch::{cli, scrape};
+use rlunch::{cli, db, scrape};
+use sqlx::PgPool;
 use tracing::{trace, warn};
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,15 +27,15 @@ async fn main() -> Result<()> {
 // #[tracing::instrument]
 async fn dispatch_commands(c: cli::Cli) -> Result<()> {
     trace!("Checking args and running desired subcommand");
-    let db = c.get_pg_pool().await?;
+    let pool = c.get_pg_pool().await?;
     match c.command {
         cli::Commands::Scrape {
             cron,
             request_delay,
-        } => scrape::run(db, cron, request_delay.into()).await?,
+        } => scrape::run(pool, cron, request_delay.into()).await?,
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(listen).await?,
-            cli::ServeCommands::Admin => run_server_admin(listen).await?,
+            cli::ServeCommands::Admin => run_server_admin(pool, listen).await?,
             cli::ServeCommands::Html { backend_addr } => {
                 run_server_html(listen, backend_addr).await?
             }
@@ -49,8 +51,14 @@ async fn run_server_json(addr: CompactString) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_admin(addr: CompactString) -> Result<()> {
+async fn run_server_admin(_pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start ADMIN server on addr: {addr}");
+
+    // let id = Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?;
+    // let ld = db::get_site_by_id(&pg, id).await?;
+    //
+    // dbg!(ld);
+
     Ok(())
 }
 

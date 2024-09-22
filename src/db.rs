@@ -7,7 +7,7 @@
 // smaller functions can work within a transaction.
 
 use crate::{
-    models::{RestaurantRows, Site, SiteWithCurrency},
+    models::{City, Country, Dish, LunchData, Restaurant, RestaurantRows, Site},
     scrape::ScrapeResult,
 };
 use anyhow::{Error, Result};
@@ -41,30 +41,6 @@ impl<'a> SiteKey<'a> {
     }
 }
 
-// pub async fn get_site_uuid(pg: &PgPool, key: SiteKey<'_>) -> Result<Uuid> {
-//     trace!(?key, "Searching for site ID...");
-//
-//     let id = sqlx::query_scalar!(
-//         r#"
-//             with co as (
-//                 select country_id from country where url_id = $1
-//             ), ci as (
-//                 select city_id from city, co where city.country_id = co.country_id and url_id = $2
-//             )
-//             select site_id from site, ci where site.city_id = ci.city_id and url_id = $3;
-//         "#,
-//         key.country_url_id,
-//         key.city_url_id,
-//         key.site_url_id
-//     )
-//     .fetch_one(pg)
-//     .await?;
-//
-//     trace!(%id, "ID  found");
-//
-//     Ok(id)
-// }
-
 pub async fn get_site_relation<'e, E>(executor: E, key: SiteKey<'_>) -> Result<SiteRelation>
 where
     E: Executor<'e, Database = Postgres>,
@@ -92,17 +68,87 @@ where
     Ok(rel)
 }
 
-pub async fn get_site_by_id(pg: &PgPool, site_id: Uuid) -> Result<SiteWithCurrency> {
-    let site = sqlx::query_as::<_, Site>(
+pub async fn get_site_by_id(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let mut site = sqlx::query_as::<_, Site>(
         r#"
             select * from site where site_id = $1
         "#,
     )
     .bind(site_id)
-    .fetch_one(pg)
+    .fetch_one(&mut *tx)
     .await?;
 
-    todo!("implement")
+    let mut city = sqlx::query_as::<_, City>(
+        r#"
+            select * from city where city_id = $1
+        "#,
+    )
+    .bind(site.city_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let mut country = sqlx::query_as::<_, Country>(
+        r#"
+            select * from country where country_id = $1
+        "#,
+    )
+    .bind(city.country_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let restaurants: Vec<Restaurant> = sqlx::query_as(
+        r#"
+            select * from restaurant where site_id = $1
+        "#,
+    )
+    .bind(site.site_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let mut restaurant_ids = Vec::new();
+    for r in &restaurants {
+        restaurant_ids.push(r.restaurant_id);
+    }
+    let dishes: Vec<Dish> = sqlx::query_as(
+        r#"
+            select
+                dish_id,
+                restaurant_id,
+                dish_name,
+                description,
+                comment,
+                string_to_array(tags, ',') as tags,
+                price,
+                created_at
+                from dish where restaurant_id in (select unnest($1::uuid[]))
+                group by dish_id
+        "#,
+    )
+    .bind(restaurant_ids)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    for r in restaurants {
+        site.restaurants.insert(r.restaurant_id, r);
+    }
+
+    for d in dishes {
+        if let Some(r) = site.restaurants.get_mut(&d.restaurant_id) {
+            r.dishes.insert(d.dish_id, d);
+        }
+    }
+
+    city.sites.insert(site.site_id, site);
+    country.cities.insert(city.city_id, city);
+
+    let mut ld = LunchData::new();
+    ld.countries.insert(country.country_id, country);
+
+    Ok(ld)
 }
 
 pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
