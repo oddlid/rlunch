@@ -1,9 +1,8 @@
-use std::time::Instant;
-
 use anyhow::Result;
 use compact_str::CompactString;
-use rlunch::{cli, db, scrape};
+use rlunch::{cli, db, scrape, web::api};
 use sqlx::PgPool;
+use std::time::Instant;
 use tracing::{trace, warn};
 use uuid::Uuid;
 
@@ -47,9 +46,8 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_json(_pg: PgPool, addr: CompactString) -> Result<()> {
-    warn!("TODO: Actually start JSON server on addr: {addr}");
-    Ok(())
+async fn run_server_json(pg: PgPool, addr: CompactString) -> Result<()> {
+    api::serve(pg, &addr).await
 }
 
 // #[tracing::instrument]

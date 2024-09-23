@@ -52,7 +52,7 @@ pub enum Commands {
     /// Start a server
     Serve {
         /// Listen address
-        #[arg(short, long, default_value_t = CompactString::from(":20666"))]
+        #[arg(short, long, default_value_t = CompactString::from("[::]:20666"))]
         listen: CompactString,
 
         /// What kind of server to start

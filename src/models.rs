@@ -52,7 +52,9 @@ impl<T: Id> UuidMap<T> {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Dish {
+    #[serde(skip_serializing)]
     pub dish_id: Uuid,
+    #[serde(skip_serializing)]
     pub restaurant_id: Uuid, // parent restaurant
     /// Name of the dish, e.g. "meatballs"
     #[sqlx(rename = "dish_name")]
@@ -165,7 +167,9 @@ impl From<UuidMap<Dish>> for DishRows {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Restaurant {
+    #[serde(skip_serializing)]
     pub restaurant_id: Uuid,
+    #[serde(skip_serializing)]
     pub site_id: Uuid, // parent site
     /// Name of restaurant
     #[sqlx(rename = "restaurant_name")]
@@ -187,6 +191,7 @@ pub struct Restaurant {
     pub parsed_at: DateTime<Local>,
     /// List of current dishes
     #[sqlx(skip)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub dishes: UuidMap<Dish>,
 }
 
@@ -303,13 +308,16 @@ impl From<Vec<Restaurant>> for RestaurantRows {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Site {
+    #[serde(skip_serializing)]
     pub site_id: Uuid,
+    #[serde(skip_serializing)]
     pub city_id: Uuid, // parent city
     pub name: String,
     pub url_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     #[sqlx(skip)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub restaurants: UuidMap<Restaurant>,
 }
 
@@ -364,11 +372,14 @@ impl Id for Site {
 #[serde(default)]
 #[sqlx(default)]
 pub struct City {
+    #[serde(skip_serializing)]
     pub city_id: Uuid,
+    #[serde(skip_serializing)]
     pub country_id: Uuid, // parent country
     pub name: String,
     pub url_id: String,
     #[sqlx(skip)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub sites: UuidMap<Site>,
 }
 
@@ -409,12 +420,14 @@ impl Id for City {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Country {
+    #[serde(skip_serializing)]
     pub country_id: Uuid,
     pub name: String,
     pub url_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency_suffix: Option<String>,
     #[sqlx(skip)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub cities: UuidMap<City>,
 }
 
