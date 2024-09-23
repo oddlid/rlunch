@@ -52,9 +52,7 @@ impl<T: Id> UuidMap<T> {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Dish {
-    #[serde(skip_serializing)]
     pub dish_id: Uuid,
-    #[serde(skip_serializing)]
     pub restaurant_id: Uuid, // parent restaurant
     /// Name of the dish, e.g. "meatballs"
     #[sqlx(rename = "dish_name")]
@@ -167,9 +165,7 @@ impl From<UuidMap<Dish>> for DishRows {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Restaurant {
-    #[serde(skip_serializing)]
     pub restaurant_id: Uuid,
-    #[serde(skip_serializing)]
     pub site_id: Uuid, // parent site
     /// Name of restaurant
     #[sqlx(rename = "restaurant_name")]
@@ -307,9 +303,7 @@ impl From<Vec<Restaurant>> for RestaurantRows {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Site {
-    #[serde(skip_serializing)]
     pub site_id: Uuid,
-    #[serde(skip_serializing)]
     pub city_id: Uuid, // parent city
     pub name: String,
     pub url_id: String,
@@ -370,9 +364,7 @@ impl Id for Site {
 #[serde(default)]
 #[sqlx(default)]
 pub struct City {
-    #[serde(skip_serializing)]
     pub city_id: Uuid,
-    #[serde(skip_serializing)]
     pub country_id: Uuid, // parent country
     pub name: String,
     pub url_id: String,
@@ -417,7 +409,6 @@ impl Id for City {
 #[serde(default)]
 #[sqlx(default)]
 pub struct Country {
-    #[serde(skip_serializing)]
     pub country_id: Uuid,
     pub name: String,
     pub url_id: String,

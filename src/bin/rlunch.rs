@@ -36,10 +36,10 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
             request_delay,
         } => scrape::run(pool, cron, request_delay.into()).await?,
         cli::Commands::Serve { listen, commands } => match commands {
-            cli::ServeCommands::Json => run_server_json(listen).await?,
+            cli::ServeCommands::Json => run_server_json(pool, listen).await?,
             cli::ServeCommands::Admin => run_server_admin(pool, listen).await?,
             cli::ServeCommands::Html { backend_addr } => {
-                run_server_html(listen, backend_addr).await?
+                run_server_html(pool, listen, backend_addr).await?
             }
         },
     }
@@ -47,7 +47,7 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_json(addr: CompactString) -> Result<()> {
+async fn run_server_json(_pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start JSON server on addr: {addr}");
     Ok(())
 }
@@ -64,15 +64,18 @@ async fn run_server_admin(pg: PgPool, addr: CompactString) -> Result<()> {
     )
     .await?;
     let duration = start.elapsed();
-    dbg!(ld);
-
     trace!("Query ran in {:?}", duration);
+    dbg!(ld);
 
     Ok(())
 }
 
 // #[tracing::instrument]
-async fn run_server_html(addr: CompactString, backend_addr: CompactString) -> Result<()> {
+async fn run_server_html(
+    _pg: PgPool,
+    addr: CompactString,
+    backend_addr: CompactString,
+) -> Result<()> {
     warn!("TODO: Actually start HTML server on addr: {addr}, with backend on: {backend_addr}");
     Ok(())
 }
