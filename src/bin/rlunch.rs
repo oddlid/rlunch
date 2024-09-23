@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use anyhow::Result;
 use compact_str::CompactString;
 use rlunch::{cli, db, scrape};
@@ -51,13 +53,20 @@ async fn run_server_json(addr: CompactString) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_admin(_pg: PgPool, addr: CompactString) -> Result<()> {
+async fn run_server_admin(pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start ADMIN server on addr: {addr}");
 
-    // let id = Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?;
-    // let ld = db::get_site_by_id(&pg, id).await?;
-    //
-    // dbg!(ld);
+    // temp, just testing
+    let start = Instant::now();
+    let ld = db::list_dishes_for_site(
+        &pg,
+        Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?,
+    )
+    .await?;
+    let duration = start.elapsed();
+    dbg!(ld);
+
+    trace!("Query ran in {:?}", duration);
 
     Ok(())
 }

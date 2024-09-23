@@ -83,18 +83,13 @@ pub async fn list_countries(pg: &PgPool) -> Result<LunchData> {
     .fetch_all(pg)
     .await?;
 
-    let mut ld = LunchData::new();
-    for c in countries {
-        ld.countries.insert(c.country_id, c);
-    }
-
-    Ok(ld)
+    Ok(LunchData::new().with_countries(countries))
 }
 
 pub async fn list_cities(pg: &PgPool, country_id: Uuid) -> Result<LunchData> {
     let mut tx = pg.begin().await?;
 
-    let mut country: Country = sqlx::query_as(
+    let country: Country = sqlx::query_as(
         r#"
             select * from country where country_id = $1
         "#,
@@ -114,20 +109,13 @@ pub async fn list_cities(pg: &PgPool, country_id: Uuid) -> Result<LunchData> {
 
     tx.rollback().await?;
 
-    for c in cities {
-        country.cities.insert(c.city_id, c);
-    }
-
-    let mut ld = LunchData::new();
-    ld.countries.insert(country.country_id, country);
-
-    Ok(ld)
+    Ok(LunchData::new().with_country(country.with_cities(cities)))
 }
 
 pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
     let mut tx = pg.begin().await?;
 
-    let mut city: City = sqlx::query_as(
+    let city: City = sqlx::query_as(
         r#"
             select * from city where city_id = $1
         "#,
@@ -136,7 +124,7 @@ pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut country: Country = sqlx::query_as(
+    let country: Country = sqlx::query_as(
         r#"
             select * from country where country_id = $1
         "#,
@@ -156,21 +144,13 @@ pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
 
     tx.rollback().await?;
 
-    for s in sites {
-        city.sites.insert(s.site_id, s);
-    }
-
-    country.cities.insert(city.city_id, city);
-    let mut ld = LunchData::new();
-    ld.countries.insert(country.country_id, country);
-
-    Ok(ld)
+    Ok(LunchData::new().with_country(country.with_city(city.with_sites(sites))))
 }
 
 pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
     let mut tx = pg.begin().await?;
 
-    let mut site: Site = sqlx::query_as(
+    let site: Site = sqlx::query_as(
         r#"
             select * from site where site_id = $1
         "#,
@@ -179,7 +159,7 @@ pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut city: City = sqlx::query_as(
+    let city: City = sqlx::query_as(
         r#"
             select * from city where city_id = $1
         "#,
@@ -188,7 +168,7 @@ pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut country: Country = sqlx::query_as(
+    let country: Country = sqlx::query_as(
         r#"
             select * from country where country_id = $1
         "#,
@@ -208,22 +188,14 @@ pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
 
     tx.rollback().await?;
 
-    for r in restaurants {
-        site.restaurants.insert(r.restaurant_id, r);
-    }
-    city.sites.insert(site.site_id, site);
-    country.cities.insert(city.city_id, city);
-
-    let mut ld = LunchData::new();
-    ld.countries.insert(country.country_id, country);
-
-    Ok(ld)
+    Ok(LunchData::new()
+        .with_country(country.with_city(city.with_site(site.with_restaurants(restaurants)))))
 }
 
 pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Result<LunchData> {
     let mut tx = pg.begin().await?;
 
-    let mut restaurant: Restaurant = sqlx::query_as(
+    let restaurant: Restaurant = sqlx::query_as(
         r#"
             select * from restaurant where restaurant_id = $1
         "#,
@@ -232,7 +204,7 @@ pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Res
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut site: Site = sqlx::query_as(
+    let site: Site = sqlx::query_as(
         r#"
             select * from site where site_id = $1
         "#,
@@ -241,7 +213,7 @@ pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Res
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut city: City = sqlx::query_as(
+    let city: City = sqlx::query_as(
         r#"
             select * from city where city_id = $1
         "#,
@@ -250,7 +222,7 @@ pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Res
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut country: Country = sqlx::query_as(
+    let country: Country = sqlx::query_as(
         r#"
             select * from country where country_id = $1
         "#,
@@ -280,18 +252,9 @@ pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Res
 
     tx.rollback().await?;
 
-    for d in dishes {
-        restaurant.dishes.insert(d.dish_id, d);
-    }
-    site.restaurants
-        .insert(restaurant.restaurant_id, restaurant);
-    city.sites.insert(site.site_id, site);
-    country.cities.insert(city.city_id, city);
-
-    let mut ld = LunchData::new();
-    ld.countries.insert(country.country_id, country);
-
-    Ok(ld)
+    Ok(LunchData::new().with_country(
+        country.with_city(city.with_site(site.with_restaurant(restaurant.with_dishes(dishes)))),
+    ))
 }
 
 pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
@@ -300,7 +263,7 @@ pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchDat
     // and dishes, rendering uuid fk references invalid.
     let mut tx = pg.begin().await?;
 
-    let mut site = sqlx::query_as::<_, Site>(
+    let site = sqlx::query_as::<_, Site>(
         r#"
             select * from site where site_id = $1
         "#,
@@ -309,7 +272,7 @@ pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchDat
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut city = sqlx::query_as::<_, City>(
+    let city = sqlx::query_as::<_, City>(
         r#"
             select * from city where city_id = $1
         "#,
@@ -318,7 +281,7 @@ pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchDat
     .fetch_one(&mut *tx)
     .await?;
 
-    let mut country = sqlx::query_as::<_, Country>(
+    let country = sqlx::query_as::<_, Country>(
         r#"
             select * from country where country_id = $1
         "#,
@@ -363,23 +326,9 @@ pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchDat
     // we just rollback now that we're done selecting
     tx.rollback().await?;
 
-    for r in restaurants {
-        site.restaurants.insert(r.restaurant_id, r);
-    }
-
-    for d in dishes {
-        if let Some(r) = site.restaurants.get_mut(&d.restaurant_id) {
-            r.dishes.insert(d.dish_id, d);
-        }
-    }
-
-    city.sites.insert(site.site_id, site);
-    country.cities.insert(city.city_id, city);
-
-    let mut ld = LunchData::new();
-    ld.countries.insert(country.country_id, country);
-
-    Ok(ld)
+    Ok(LunchData::new().with_country(
+        country.with_city(city.with_site(site.with_restaurants(restaurants).with_dishes(dishes))),
+    ))
 }
 
 // I'm evaluating if I should write a "list_all" function as well, to get everything in the DB into a

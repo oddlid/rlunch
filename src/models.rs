@@ -11,17 +11,16 @@ use std::{
 };
 use uuid::Uuid;
 
+pub trait Id {
+    fn id(&self) -> Uuid;
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 pub struct UuidMap<T>(pub HashMap<Uuid, T>);
 
-impl<T, U: std::convert::From<T>> From<Vec<T>> for UuidMap<U> {
+impl<T: Id, U: std::convert::From<T>> From<Vec<T>> for UuidMap<U> {
     fn from(value: Vec<T>) -> Self {
-        Self(
-            value
-                .into_iter()
-                .map(|v| (Uuid::new_v4(), v.into()))
-                .collect(),
-        )
+        Self(value.into_iter().map(|v| (v.id(), v.into())).collect())
     }
 }
 
@@ -39,9 +38,13 @@ impl<T> DerefMut for UuidMap<T> {
     }
 }
 
-impl<T> UuidMap<T> {
+impl<T: Id> UuidMap<T> {
     pub fn into_vec<U: std::convert::From<T>>(mut self) -> Vec<U> {
         self.drain().map(|(_, v)| v.into()).collect()
+    }
+
+    pub fn add(&mut self, v: T) -> Option<T> {
+        self.insert(v.id(), v)
     }
 }
 
@@ -82,6 +85,12 @@ impl Dish {
             restaurant_id,
             ..self
         }
+    }
+}
+
+impl Id for Dish {
+    fn id(&self) -> Uuid {
+        self.dish_id
     }
 }
 
@@ -204,6 +213,30 @@ impl Restaurant {
             ..Default::default()
         }
     }
+
+    pub fn add(&mut self, dish: Dish) -> Option<Dish> {
+        self.dishes.add(dish)
+    }
+
+    pub fn set_dishes(&mut self, dishes: Vec<Dish>) {
+        self.dishes = dishes.into()
+    }
+
+    pub fn with_dish(mut self, dish: Dish) -> Self {
+        self.add(dish);
+        self
+    }
+
+    pub fn with_dishes(mut self, dishes: Vec<Dish>) -> Self {
+        self.set_dishes(dishes);
+        self
+    }
+}
+
+impl Id for Restaurant {
+    fn id(&self) -> Uuid {
+        self.restaurant_id
+    }
 }
 
 impl From<api::Restaurant> for Restaurant {
@@ -293,6 +326,44 @@ impl Site {
             ..Default::default()
         }
     }
+
+    pub fn add(&mut self, restaurant: Restaurant) -> Option<Restaurant> {
+        self.restaurants.add(restaurant)
+    }
+
+    pub fn set_restaurants(&mut self, restaurants: Vec<Restaurant>) {
+        self.restaurants = restaurants.into()
+    }
+
+    /// Add dishes to any restaurant in this site
+    pub fn add_dishes(&mut self, dishes: Vec<Dish>) {
+        for d in dishes {
+            if let Some(r) = self.restaurants.get_mut(&d.restaurant_id) {
+                r.add(d);
+            }
+        }
+    }
+
+    pub fn with_restaurant(mut self, restaurant: Restaurant) -> Self {
+        self.add(restaurant);
+        self
+    }
+
+    pub fn with_restaurants(mut self, restaurants: Vec<Restaurant>) -> Self {
+        self.set_restaurants(restaurants);
+        self
+    }
+
+    pub fn with_dishes(mut self, dishes: Vec<Dish>) -> Self {
+        self.add_dishes(dishes);
+        self
+    }
+}
+
+impl Id for Site {
+    fn id(&self) -> Uuid {
+        self.site_id
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
@@ -315,6 +386,30 @@ impl City {
             name: name.into(),
             ..Default::default()
         }
+    }
+
+    pub fn add(&mut self, site: Site) -> Option<Site> {
+        self.sites.add(site)
+    }
+
+    pub fn set_sites(&mut self, sites: Vec<Site>) {
+        self.sites = sites.into()
+    }
+
+    pub fn with_site(mut self, site: Site) -> Self {
+        self.add(site);
+        self
+    }
+
+    pub fn with_sites(mut self, sites: Vec<Site>) -> Self {
+        self.set_sites(sites);
+        self
+    }
+}
+
+impl Id for City {
+    fn id(&self) -> Uuid {
+        self.city_id
     }
 }
 
@@ -339,6 +434,30 @@ impl Country {
             ..Default::default()
         }
     }
+
+    pub fn add(&mut self, city: City) -> Option<City> {
+        self.cities.add(city)
+    }
+
+    pub fn set_cities(&mut self, cities: Vec<City>) {
+        self.cities = cities.into()
+    }
+
+    pub fn with_city(mut self, city: City) -> Self {
+        self.add(city);
+        self
+    }
+
+    pub fn with_cities(mut self, cities: Vec<City>) -> Self {
+        self.set_cities(cities);
+        self
+    }
+}
+
+impl Id for Country {
+    fn id(&self) -> Uuid {
+        self.country_id
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
@@ -353,6 +472,24 @@ pub struct LunchData {
 impl LunchData {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn add(&mut self, country: Country) -> Option<Country> {
+        self.countries.add(country)
+    }
+
+    pub fn set_countries(&mut self, countries: Vec<Country>) {
+        self.countries = countries.into()
+    }
+
+    pub fn with_country(mut self, country: Country) -> Self {
+        self.add(country);
+        self
+    }
+
+    pub fn with_countries(mut self, countries: Vec<Country>) -> Self {
+        self.set_countries(countries);
+        self
     }
 }
 
@@ -376,6 +513,7 @@ pub mod api {
     use chrono::{DateTime, Local};
     use serde::{Deserialize, Serialize};
     use std::convert::From;
+    use uuid::Uuid;
 
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
@@ -400,6 +538,12 @@ pub mod api {
                 name: name.into(),
                 ..Default::default()
             }
+        }
+    }
+
+    impl super::Id for Dish {
+        fn id(&self) -> Uuid {
+            Uuid::new_v4()
         }
     }
 
