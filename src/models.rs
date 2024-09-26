@@ -66,6 +66,7 @@ pub struct Dish {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     /// Optionals tags for filtering, e.g. "vego,gluten,lactose"
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     /// Price, in whatever currency is in use
     pub price: f32,

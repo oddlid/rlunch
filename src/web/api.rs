@@ -3,16 +3,14 @@ use crate::{db, models::LunchData, signals::shutdown_signal};
 use anyhow::Context;
 use axum::{
     extract::{Path, State},
+    response::Redirect,
     routing::get,
     Json, Router,
 };
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
-use tower_http::{
-    catch_panic::CatchPanicLayer, compression::CompressionLayer, timeout::TimeoutLayer,
-    trace::TraceLayer,
-};
+use tower_http::{catch_panic::CatchPanicLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::trace;
 use uuid::Uuid;
 
@@ -31,7 +29,6 @@ fn api_router(ctx: ApiContext) -> Router {
     Router::new()
         .merge(router())
         .layer((
-            CompressionLayer::new(),
             TraceLayer::new_for_http().on_failure(()),
             TimeoutLayer::new(Duration::from_secs(30)),
             CatchPanicLayer::new(),
@@ -41,7 +38,8 @@ fn api_router(ctx: ApiContext) -> Router {
 
 fn router() -> Router<ApiContext> {
     Router::new()
-        .route("/", get(list_countries))
+        .route("/", get(|| async { Redirect::permanent("/countries/") }))
+        .route("/countries/", get(list_countries))
         .route("/cities/:country_id", get(list_cities))
         .route("/sites/:city_id", get(list_sites))
         .route("/restaurants/:site_id", get(list_restaurants))

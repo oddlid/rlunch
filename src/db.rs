@@ -17,6 +17,7 @@ use crate::{
     scrape::ScrapeResult,
 };
 use anyhow::{Error, Result};
+// use compact_str::CompactString;
 use sqlx::{Executor, PgPool, Postgres};
 use std::time::Instant;
 use tracing::trace;
@@ -47,6 +48,135 @@ impl<'a> SiteKey<'a> {
     }
 }
 
+// #[derive(Debug, Clone, Default, PartialEq)]
+// struct PathElement {
+//     id: Option<Uuid>,
+//     path: Option<CompactString>,
+// }
+//
+// impl PathElement {
+//     // fn set_id(&mut self, id: Uuid) {
+//     //     self.id = Some(id);
+//     // }
+//
+//     fn set_path(&mut self, path: Option<&str>) {
+//         if let Some(p) = path {
+//             self.path = Some(p.into())
+//         }
+//     }
+//
+//     fn has_path(&self) -> bool {
+//         self.path.as_ref().is_some_and(|s| !s.is_empty())
+//     }
+// }
+//
+// #[derive(Debug, Clone, Default, PartialEq)]
+// pub struct DBPath {
+//     country: PathElement,
+//     city: PathElement,
+//     site: PathElement,
+//     restaurant: PathElement,
+//     dish: PathElement,
+// }
+//
+// impl DBPath {
+//     pub fn new() -> Self {
+//         Self {
+//             ..Default::default()
+//         }
+//     }
+//
+//     pub fn with_country(mut self, country: Option<&str>) -> Self {
+//         self.country.set_path(country);
+//         self
+//     }
+//
+//     pub fn with_city(mut self, path: Option<&str>) -> Self {
+//         self.city.set_path(path);
+//         self
+//     }
+//
+//     pub fn with_site(mut self, path: Option<&str>) -> Self {
+//         self.site.set_path(path);
+//         self
+//     }
+//
+//     pub fn with_restaurant(mut self, path: Option<&str>) -> Self {
+//         self.restaurant.set_path(path);
+//         self
+//     }
+//
+//     pub fn with_dish(mut self, path: Option<&str>) -> Self {
+//         self.dish.set_path(path);
+//         self
+//     }
+//
+//     /// `path` should be a string separated by /, with no leading slash.
+//     /// The expected format is "country/city/site/restaurant/dish", where
+//     /// country, city and site should be the url_id field in the DB, and
+//     /// restaurant and dish should be the respective names.
+//     /// The parts will be parsed in that order, as found.
+//     /// All parts are optional, but at least the first part for country should be given,
+//     /// for the result to be of any use.
+//     pub fn parse(path: &str) -> Self {
+//         let mut parts = path.split('/').collect::<Vec<&str>>();
+//         parts.reverse();
+//         Self::new()
+//             .with_country(parts.pop())
+//             .with_city(parts.pop())
+//             .with_site(parts.pop())
+//             .with_restaurant(parts.pop())
+//             .with_dish(parts.pop())
+//     }
+//
+//     fn has_country(&self) -> bool {
+//         self.country.has_path()
+//     }
+//
+//     fn has_city(&self) -> bool {
+//         self.city.has_path()
+//     }
+//
+//     fn has_site(&self) -> bool {
+//         self.site.has_path()
+//     }
+//
+//     fn has_restaurant(&self) -> bool {
+//         self.restaurant.has_path()
+//     }
+//
+//     fn has_dish(&self) -> bool {
+//         self.dish.has_path()
+//     }
+//
+//     fn is_empty(&self) -> bool {
+//         !self.has_country()
+//             && !self.has_city()
+//             && !self.has_site()
+//             && !self.has_restaurant()
+//             && !self.has_dish()
+//     }
+//
+//     fn is_full(&self) -> bool {
+//         self.has_country()
+//             && self.has_city()
+//             && self.has_site()
+//             && self.has_restaurant()
+//             && self.has_dish()
+//     }
+//
+//     fn has_up_to_site(&self) -> bool {
+//         self.has_country() && self.has_city() && self.has_site()
+//     }
+// }
+
+// this signature is taken from https://github.com/launchbadge/sqlx/issues/419
+// Unfortunately it doesn't work to use the executor more than once within the same
+// function, since the value is moved.
+// So in reality, this has no value other than saving it as an example of a parameter
+// that can accept both &PgPool or &mut *Transaction.
+// This might be of use later though, if I refactor so that each function only use the executor
+// once, and I call several small functions with the same executor.
 pub async fn get_site_relation<'e, E>(executor: E, key: SiteKey<'_>) -> Result<SiteRelation>
 where
     E: Executor<'e, Database = Postgres>,
@@ -86,152 +216,139 @@ pub async fn list_countries(pg: &PgPool) -> Result<LunchData> {
     Ok(LunchData::new().with_countries(countries))
 }
 
-pub async fn list_cities(pg: &PgPool, country_id: Uuid) -> Result<LunchData> {
-    let mut tx = pg.begin().await?;
+// template
+pub async fn get_x<'e, E>(_ex: E) -> Result<()>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    Ok(())
+}
 
-    let country: Country = sqlx::query_as(
+pub async fn get_country<'e, E>(ex: E, country_id: Uuid) -> Result<Country>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select * from country where country_id = $1
         "#,
     )
     .bind(country_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    .fetch_one(ex)
+    .await
+    .map_err(Error::from)
+}
 
-    let cities: Vec<City> = sqlx::query_as(
+pub async fn get_city<'e, E>(ex: E, city_id: Uuid) -> Result<City>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
+        r#"
+            select * from city where city_id = $1
+        "#,
+    )
+    .bind(city_id)
+    .fetch_one(ex)
+    .await
+    .map_err(Error::from)
+}
+
+pub async fn get_cities<'e, E>(ex: E, country_id: Uuid) -> Result<Vec<City>>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select * from city where country_id = $1
         "#,
     )
     .bind(country_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    tx.rollback().await?;
-
-    Ok(LunchData::new().with_country(country.with_cities(cities)))
+    .fetch_all(ex)
+    .await
+    .map_err(Error::from)
 }
 
-pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
-    let mut tx = pg.begin().await?;
-
-    let city: City = sqlx::query_as(
-        r#"
-            select * from city where city_id = $1
-        "#,
-    )
-    .bind(city_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let country: Country = sqlx::query_as(
-        r#"
-            select * from country where country_id = $1
-        "#,
-    )
-    .bind(city.country_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let sites: Vec<Site> = sqlx::query_as(
-        r#"
-            select * from site where city_id = $1
-        "#,
-    )
-    .bind(city_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    tx.rollback().await?;
-
-    Ok(LunchData::new().with_country(country.with_city(city.with_sites(sites))))
-}
-
-pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
-    let mut tx = pg.begin().await?;
-
-    let site: Site = sqlx::query_as(
+pub async fn get_site<'e, E>(ex: E, site_id: Uuid) -> Result<Site>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select * from site where site_id = $1
         "#,
     )
     .bind(site_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let city: City = sqlx::query_as(
-        r#"
-            select * from city where city_id = $1
-        "#,
-    )
-    .bind(site.city_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let country: Country = sqlx::query_as(
-        r#"
-            select * from country where country_id = $1
-        "#,
-    )
-    .bind(city.country_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let restaurants: Vec<Restaurant> = sqlx::query_as(
-        r#"
-            select * from restaurant where site_id = $1
-        "#,
-    )
-    .bind(site.site_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    tx.rollback().await?;
-
-    Ok(LunchData::new()
-        .with_country(country.with_city(city.with_site(site.with_restaurants(restaurants)))))
+    .fetch_one(ex)
+    .await
+    .map_err(Error::from)
 }
 
-pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Result<LunchData> {
-    let mut tx = pg.begin().await?;
+pub async fn get_sites<'e, E>(ex: E, city_id: Uuid) -> Result<Vec<Site>>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
+        r#"
+            select * from site where city_id = $1
+        "#,
+    )
+    .bind(city_id)
+    .fetch_all(ex)
+    .await
+    .map_err(Error::from)
+}
 
-    let restaurant: Restaurant = sqlx::query_as(
+pub async fn get_restaurant<'e, E>(ex: E, restaurant_id: Uuid) -> Result<Restaurant>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select * from restaurant where restaurant_id = $1
         "#,
     )
     .bind(restaurant_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    .fetch_one(ex)
+    .await
+    .map_err(Error::from)
+}
 
-    let site: Site = sqlx::query_as(
+pub async fn get_restaurants<'e, E>(ex: E, site_id: Uuid) -> Result<Vec<Restaurant>>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
-            select * from site where site_id = $1
+            select * from restaurant where site_id = $1
         "#,
     )
-    .bind(restaurant.site_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    .bind(site_id)
+    .fetch_all(ex)
+    .await
+    .map_err(Error::from)
+}
 
-    let city: City = sqlx::query_as(
+pub async fn get_dish<'e, E>(ex: E, dish_id: Uuid) -> Result<Dish>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
-            select * from city where city_id = $1
+            select * from dish where dish_id = $1
         "#,
     )
-    .bind(site.city_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    .bind(dish_id)
+    .fetch_one(ex)
+    .await
+    .map_err(Error::from)
+}
 
-    let country: Country = sqlx::query_as(
-        r#"
-            select * from country where country_id = $1
-        "#,
-    )
-    .bind(city.country_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let dishes: Vec<Dish> = sqlx::query_as(
+pub async fn get_dishes_for_restaurant<'e, E>(ex: E, restaurant_id: Uuid) -> Result<Vec<Dish>>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select
                 dish_id,
@@ -246,64 +363,25 @@ pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Res
                 group by dish_id
         "#,
     )
-    .bind(restaurant.restaurant_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    tx.rollback().await?;
-
-    Ok(LunchData::new().with_country(
-        country.with_city(city.with_site(site.with_restaurant(restaurant.with_dishes(dishes)))),
-    ))
+    .bind(restaurant_id)
+    .fetch_all(ex)
+    .await
+    .map_err(Error::from)
 }
 
-pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
-    // we use a transaction only to get a consistent view between several queries,
-    // as it could happen that an update comes in in between, deleting restaurants
-    // and dishes, rendering uuid fk references invalid.
-    let mut tx = pg.begin().await?;
-
-    let site = sqlx::query_as::<_, Site>(
-        r#"
-            select * from site where site_id = $1
-        "#,
-    )
-    .bind(site_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let city = sqlx::query_as::<_, City>(
-        r#"
-            select * from city where city_id = $1
-        "#,
-    )
-    .bind(site.city_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let country = sqlx::query_as::<_, Country>(
-        r#"
-            select * from country where country_id = $1
-        "#,
-    )
-    .bind(city.country_id)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let restaurants: Vec<Restaurant> = sqlx::query_as(
-        r#"
-            select * from restaurant where site_id = $1
-        "#,
-    )
-    .bind(site.site_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    let mut restaurant_ids = Vec::new();
-    for r in &restaurants {
-        restaurant_ids.push(r.restaurant_id);
+pub fn get_restaurant_ids(restaurants: &[Restaurant]) -> Vec<Uuid> {
+    let mut ids = Vec::with_capacity(restaurants.len());
+    for r in restaurants {
+        ids.push(r.restaurant_id);
     }
-    let dishes: Vec<Dish> = sqlx::query_as(
+    ids
+}
+
+pub async fn get_dishes_for_site<'e, E>(ex: E, restaurant_ids: Vec<Uuid>) -> Result<Vec<Dish>>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as(
         r#"
             select
                 dish_id,
@@ -319,8 +397,75 @@ pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchDat
         "#,
     )
     .bind(restaurant_ids)
-    .fetch_all(&mut *tx)
-    .await?;
+    .fetch_all(ex)
+    .await
+    .map_err(Error::from)
+}
+
+pub async fn list_cities(pg: &PgPool, country_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let country = get_country(&mut *tx, country_id).await?;
+    let cities = get_cities(&mut *tx, country_id).await?;
+
+    tx.rollback().await?;
+
+    Ok(LunchData::new().with_country(country.with_cities(cities)))
+}
+
+pub async fn list_sites(pg: &PgPool, city_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let city = get_city(&mut *tx, city_id).await?;
+    let country = get_country(&mut *tx, city.country_id).await?;
+    let sites = get_sites(&mut *tx, city_id).await?;
+
+    tx.rollback().await?;
+
+    Ok(LunchData::new().with_country(country.with_city(city.with_sites(sites))))
+}
+
+pub async fn list_restaurants(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let site = get_site(&mut *tx, site_id).await?;
+    let city = get_city(&mut *tx, site.city_id).await?;
+    let country = get_country(&mut *tx, city.country_id).await?;
+    let restaurants = get_restaurants(&mut *tx, site_id).await?;
+
+    tx.rollback().await?;
+
+    Ok(LunchData::new()
+        .with_country(country.with_city(city.with_site(site.with_restaurants(restaurants)))))
+}
+
+pub async fn list_dishes_for_restaurant(pg: &PgPool, restaurant_id: Uuid) -> Result<LunchData> {
+    let mut tx = pg.begin().await?;
+
+    let restaurant = get_restaurant(&mut *tx, restaurant_id).await?;
+    let site = get_site(&mut *tx, restaurant.site_id).await?;
+    let city = get_city(&mut *tx, site.city_id).await?;
+    let country = get_country(&mut *tx, city.country_id).await?;
+    let dishes = get_dishes_for_restaurant(&mut *tx, restaurant_id).await?;
+
+    tx.rollback().await?;
+
+    Ok(LunchData::new().with_country(
+        country.with_city(city.with_site(site.with_restaurant(restaurant.with_dishes(dishes)))),
+    ))
+}
+
+pub async fn list_dishes_for_site(pg: &PgPool, site_id: Uuid) -> Result<LunchData> {
+    // we use a transaction only to get a consistent view between several queries,
+    // as it could happen that an update comes in in between, deleting restaurants
+    // and dishes, rendering uuid fk references invalid.
+    let mut tx = pg.begin().await?;
+
+    let site = get_site(&mut *tx, site_id).await?;
+    let city = get_city(&mut *tx, site.city_id).await?;
+    let country = get_country(&mut *tx, city.country_id).await?;
+    let restaurants = get_restaurants(&mut *tx, site_id).await?;
+    let dishes = get_dishes_for_site(&mut *tx, get_restaurant_ids(&restaurants)).await?;
 
     // since we haven't done any modifications in our queries,
     // we just rollback now that we're done selecting
