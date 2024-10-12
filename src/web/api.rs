@@ -58,25 +58,31 @@ async fn list_countries(ctx: State<ApiContext>) -> Result<Json<LunchData>> {
     Ok(Json(res))
 }
 
-async fn list_cities(ctx: State<ApiContext>, Path(id): Path<Uuid>) -> Result<Json<LunchData>> {
+async fn list_cities(
+    ctx: State<ApiContext>,
+    Path(country_id): Path<Uuid>,
+) -> Result<Json<LunchData>> {
     let start = Instant::now();
-    let res = db::list_cities(&ctx.db, id).await?;
+    let res = db::list_cities_for_country_by_id(&mut ctx.get_tx().await?, country_id).await?;
     let duration = start.elapsed();
     trace!("Fetched city list in {:?}", duration);
     Ok(Json(res))
 }
 
-async fn list_sites(ctx: State<ApiContext>, Path(id): Path<Uuid>) -> Result<Json<LunchData>> {
+async fn list_sites(ctx: State<ApiContext>, Path(city_id): Path<Uuid>) -> Result<Json<LunchData>> {
     let start = Instant::now();
-    let res = db::list_sites(&ctx.db, id).await?;
+    let res = db::list_sites_for_city_by_id(&mut ctx.get_tx().await?, city_id).await?;
     let duration = start.elapsed();
     trace!("Fetched site list in {:?}", duration);
     Ok(Json(res))
 }
 
-async fn list_restaurants(ctx: State<ApiContext>, Path(id): Path<Uuid>) -> Result<Json<LunchData>> {
+async fn list_restaurants(
+    ctx: State<ApiContext>,
+    Path(site_id): Path<Uuid>,
+) -> Result<Json<LunchData>> {
     let start = Instant::now();
-    let res = db::list_restaurants(&ctx.db, id).await?;
+    let res = db::list_restaurants_for_site_by_id(&mut ctx.get_tx().await?, site_id).await?;
     let duration = start.elapsed();
     trace!("Fetched restaurant list in {:?}", duration);
     Ok(Json(res))
@@ -84,10 +90,10 @@ async fn list_restaurants(ctx: State<ApiContext>, Path(id): Path<Uuid>) -> Resul
 
 async fn list_dishes_for_restaurant(
     ctx: State<ApiContext>,
-    Path(id): Path<Uuid>,
+    Path(restaurant_id): Path<Uuid>,
 ) -> Result<Json<LunchData>> {
     let start = Instant::now();
-    let res = db::list_dishes_for_restaurant(&ctx.db, id).await?;
+    let res = db::list_dishes_for_restaurant_by_id(&mut ctx.get_tx().await?, restaurant_id).await?;
     let duration = start.elapsed();
     trace!("Fetched dishes for restaurant list in {:?}", duration);
     Ok(Json(res))
@@ -95,10 +101,10 @@ async fn list_dishes_for_restaurant(
 
 async fn list_dishes_for_site(
     ctx: State<ApiContext>,
-    Path(id): Path<Uuid>,
+    Path(site_id): Path<Uuid>,
 ) -> Result<Json<LunchData>> {
     let start = Instant::now();
-    let res = db::list_dishes_for_site(&ctx.db, id).await?;
+    let res = db::list_dishes_for_site_by_id(&mut ctx.get_tx().await?, site_id).await?;
     let duration = start.elapsed();
     trace!("Fetched dishes for site list in {:?}", duration);
     Ok(Json(res))

@@ -55,15 +55,15 @@ async fn run_server_admin(pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start ADMIN server on addr: {addr}");
 
     // temp, just testing
-    let start = Instant::now();
-    let ld = db::list_dishes_for_site(
-        &pg,
-        Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?,
-    )
-    .await?;
-    let duration = start.elapsed();
-    trace!("Query ran in {:?}", duration);
-    dbg!(ld);
+    // let start = Instant::now();
+    // let ld = db::list_dishes_for_site_by_id(
+    //     &pg,
+    //     Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?,
+    // )
+    // .await?;
+    // let duration = start.elapsed();
+    // trace!("Query ran in {:?}", duration);
+    // dbg!(ld);
 
     Ok(())
 }

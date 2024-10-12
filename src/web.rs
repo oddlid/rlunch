@@ -1,3 +1,4 @@
+use crate::db;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -11,6 +12,12 @@ pub mod html;
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     pub db: PgPool,
+}
+
+impl ApiContext {
+    pub async fn get_tx(&self) -> Result<db::Transaction<'_>> {
+        self.db.begin().await.map_err(Error::from)
+    }
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
