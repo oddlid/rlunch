@@ -16,28 +16,26 @@ use crate::{
     models::{City, Country, Dish, LunchData, Restaurant, RestaurantRows, Site},
     scrape::ScrapeResult,
 };
-use anyhow::{Error, Result};
-// use compact_str::CompactString;
-use sqlx::{Executor, PgPool, Postgres};
+use anyhow::Result;
+use sqlx::{Error, Executor, PgPool, Postgres};
 use std::time::Instant;
 use tracing::trace;
 use uuid::Uuid;
 
 pub type Transaction<'a> = sqlx::Transaction<'a, Postgres>;
 
+enum SiteKeyLevel {
+    Empty,
+    Country,
+    City,
+    Site,
+}
+
 #[derive(Debug)]
 pub struct SiteKey<'a> {
     pub country_url_id: &'a str,
     pub city_url_id: &'a str,
     pub site_url_id: &'a str,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, sqlx::FromRow)]
-#[sqlx(default)]
-pub struct SiteRelation {
-    pub country_id: Uuid,
-    pub city_id: Uuid,
-    pub site_id: Uuid,
 }
 
 impl<'a> SiteKey<'a> {
@@ -48,163 +46,104 @@ impl<'a> SiteKey<'a> {
             site_url_id,
         }
     }
+
+    fn level(&self) -> SiteKeyLevel {
+        if !self.country_url_id.is_empty()
+            && !self.city_url_id.is_empty()
+            && !self.site_url_id.is_empty()
+        {
+            return SiteKeyLevel::Site;
+        } else if !self.country_url_id.is_empty() && !self.city_url_id.is_empty() {
+            return SiteKeyLevel::City;
+        } else if !self.country_url_id.is_empty() {
+            return SiteKeyLevel::Country;
+        }
+        SiteKeyLevel::Empty
+    }
 }
 
-// #[derive(Debug, Clone, Default, PartialEq)]
-// struct PathElement {
-//     id: Option<Uuid>,
-//     path: Option<CompactString>,
-// }
-//
-// impl PathElement {
-//     // fn set_id(&mut self, id: Uuid) {
-//     //     self.id = Some(id);
-//     // }
-//
-//     fn set_path(&mut self, path: Option<&str>) {
-//         if let Some(p) = path {
-//             self.path = Some(p.into())
-//         }
-//     }
-//
-//     fn has_path(&self) -> bool {
-//         self.path.as_ref().is_some_and(|s| !s.is_empty())
-//     }
-// }
-//
-// #[derive(Debug, Clone, Default, PartialEq)]
-// pub struct DBPath {
-//     country: PathElement,
-//     city: PathElement,
-//     site: PathElement,
-//     restaurant: PathElement,
-//     dish: PathElement,
-// }
-//
-// impl DBPath {
-//     pub fn new() -> Self {
-//         Self {
-//             ..Default::default()
-//         }
-//     }
-//
-//     pub fn with_country(mut self, country: Option<&str>) -> Self {
-//         self.country.set_path(country);
-//         self
-//     }
-//
-//     pub fn with_city(mut self, path: Option<&str>) -> Self {
-//         self.city.set_path(path);
-//         self
-//     }
-//
-//     pub fn with_site(mut self, path: Option<&str>) -> Self {
-//         self.site.set_path(path);
-//         self
-//     }
-//
-//     pub fn with_restaurant(mut self, path: Option<&str>) -> Self {
-//         self.restaurant.set_path(path);
-//         self
-//     }
-//
-//     pub fn with_dish(mut self, path: Option<&str>) -> Self {
-//         self.dish.set_path(path);
-//         self
-//     }
-//
-//     /// `path` should be a string separated by /, with no leading slash.
-//     /// The expected format is "country/city/site/restaurant/dish", where
-//     /// country, city and site should be the url_id field in the DB, and
-//     /// restaurant and dish should be the respective names.
-//     /// The parts will be parsed in that order, as found.
-//     /// All parts are optional, but at least the first part for country should be given,
-//     /// for the result to be of any use.
-//     pub fn parse(path: &str) -> Self {
-//         let mut parts = path.split('/').collect::<Vec<&str>>();
-//         parts.reverse();
-//         Self::new()
-//             .with_country(parts.pop())
-//             .with_city(parts.pop())
-//             .with_site(parts.pop())
-//             .with_restaurant(parts.pop())
-//             .with_dish(parts.pop())
-//     }
-//
-//     fn has_country(&self) -> bool {
-//         self.country.has_path()
-//     }
-//
-//     fn has_city(&self) -> bool {
-//         self.city.has_path()
-//     }
-//
-//     fn has_site(&self) -> bool {
-//         self.site.has_path()
-//     }
-//
-//     fn has_restaurant(&self) -> bool {
-//         self.restaurant.has_path()
-//     }
-//
-//     fn has_dish(&self) -> bool {
-//         self.dish.has_path()
-//     }
-//
-//     fn is_empty(&self) -> bool {
-//         !self.has_country()
-//             && !self.has_city()
-//             && !self.has_site()
-//             && !self.has_restaurant()
-//             && !self.has_dish()
-//     }
-//
-//     fn is_full(&self) -> bool {
-//         self.has_country()
-//             && self.has_city()
-//             && self.has_site()
-//             && self.has_restaurant()
-//             && self.has_dish()
-//     }
-//
-//     fn has_up_to_site(&self) -> bool {
-//         self.has_country() && self.has_city() && self.has_site()
-//     }
-// }
+#[derive(Debug, Clone, Default, PartialEq, sqlx::FromRow)]
+#[sqlx(default)]
+pub struct SiteRelation {
+    pub country_id: Uuid,
+    pub city_id: Uuid,
+    pub site_id: Uuid,
+}
+
+impl SiteRelation {
+    fn empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
 
 // this signature is taken from https://github.com/launchbadge/sqlx/issues/419
 // Unfortunately it doesn't work to use the executor more than once within the same
 // function, since the value is moved.
 // This might be of use later, if I refactor so that each function only use the executor
 // once, and I call several small functions with the same executor.
-pub async fn get_site_relation<'e, E>(executor: E, key: SiteKey<'_>) -> Result<SiteRelation>
+pub async fn get_site_relation<'e, E>(executor: E, key: SiteKey<'_>) -> Result<SiteRelation, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
     trace!(?key, "Searching for site relation...");
 
-    let rel = sqlx::query_as::<_, SiteRelation>(
-        r#"
-            with co as (
-                select country_id from country where url_id = $1
-            ), ci as (
-                select city_id from city, co where city.country_id = co.country_id and url_id = $2
+    let rel: SiteRelation = match key.level() {
+        SiteKeyLevel::Site => {
+            sqlx::query_as(
+                r#"
+                    with co as (
+                        select country_id from country where url_id = $1
+                    ), ci as (
+                        select city_id from city, co where city.country_id = co.country_id and url_id = $2
+                    )
+                    select co.country_id, ci.city_id, site_id from co, ci, site where site.city_id = ci.city_id and url_id = $3;
+                "#,
             )
-            select co.country_id, ci.city_id, site_id from co, ci, site where site.city_id = ci.city_id and url_id = $3;
-        "#,
-    )
-    .bind(key.country_url_id)
-    .bind(key.city_url_id)
-    .bind(key.site_url_id)
-    .fetch_one(executor)
-    .await?;
+            .bind(key.country_url_id)
+            .bind(key.city_url_id)
+            .bind(key.site_url_id)
+            .fetch_one(executor)
+            .await?
+        }
+        SiteKeyLevel::City => {
+            sqlx::query_as(
+                r#"
+                    with co as (
+                        select country_id from country where url_id = $1
+                    )
+                    select co.country_id, city_id, '00000000-0000-0000-0000-000000000000' from co, city where city.country_id = co.country_id and url_id = $2
+                "#,
+            )
+            .bind(key.country_url_id)
+            .bind(key.city_url_id)
+            .fetch_one(executor)
+            .await?
+        }
+        SiteKeyLevel::Country => {
+            sqlx::query_as(
+                r#"
+                    select country_id, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000' from country where url_id = $1
+                "#,
+            )
+            .bind(key.country_url_id)
+            .fetch_one(executor)
+            .await?
+        }
+        SiteKeyLevel::Empty => {
+           SiteRelation::default()
+        }
+    };
+
+    if rel.empty() {
+        return Err(sqlx::Error::RowNotFound);
+    }
 
     trace!(?rel, "Relation  found");
 
     Ok(rel)
 }
 
-pub async fn get_countries<'e, E>(ex: E) -> Result<Vec<Country>>
+pub async fn get_countries<'e, E>(ex: E) -> Result<Vec<Country>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -215,10 +154,9 @@ where
     )
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_country<'e, E>(ex: E, country_id: Uuid) -> Result<Country>
+pub async fn get_country<'e, E>(ex: E, country_id: Uuid) -> Result<Country, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -230,10 +168,9 @@ where
     .bind(country_id)
     .fetch_one(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_city<'e, E>(ex: E, city_id: Uuid) -> Result<City>
+pub async fn get_city<'e, E>(ex: E, city_id: Uuid) -> Result<City, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -245,10 +182,9 @@ where
     .bind(city_id)
     .fetch_one(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_cities_for_country<'e, E>(ex: E, country_id: Uuid) -> Result<Vec<City>>
+pub async fn get_cities_for_country<'e, E>(ex: E, country_id: Uuid) -> Result<Vec<City>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -260,10 +196,9 @@ where
     .bind(country_id)
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_site<'e, E>(ex: E, site_id: Uuid) -> Result<Site>
+pub async fn get_site<'e, E>(ex: E, site_id: Uuid) -> Result<Site, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -275,10 +210,9 @@ where
     .bind(site_id)
     .fetch_one(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_sites_for_city<'e, E>(ex: E, city_id: Uuid) -> Result<Vec<Site>>
+pub async fn get_sites_for_city<'e, E>(ex: E, city_id: Uuid) -> Result<Vec<Site>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -290,10 +224,9 @@ where
     .bind(city_id)
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_restaurant<'e, E>(ex: E, restaurant_id: Uuid) -> Result<Restaurant>
+pub async fn get_restaurant<'e, E>(ex: E, restaurant_id: Uuid) -> Result<Restaurant, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -305,10 +238,9 @@ where
     .bind(restaurant_id)
     .fetch_one(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_restaurants_for_site<'e, E>(ex: E, site_id: Uuid) -> Result<Vec<Restaurant>>
+pub async fn get_restaurants_for_site<'e, E>(ex: E, site_id: Uuid) -> Result<Vec<Restaurant>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -320,10 +252,9 @@ where
     .bind(site_id)
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_dish<'e, E>(ex: E, dish_id: Uuid) -> Result<Dish>
+pub async fn get_dish<'e, E>(ex: E, dish_id: Uuid) -> Result<Dish, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -335,10 +266,12 @@ where
     .bind(dish_id)
     .fetch_one(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn get_dishes_for_restaurant<'e, E>(ex: E, restaurant_id: Uuid) -> Result<Vec<Dish>>
+pub async fn get_dishes_for_restaurant<'e, E>(
+    ex: E,
+    restaurant_id: Uuid,
+) -> Result<Vec<Dish>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -360,7 +293,6 @@ where
     .bind(restaurant_id)
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
 pub fn get_restaurant_ids(restaurants: &[Restaurant]) -> Vec<Uuid> {
@@ -371,7 +303,10 @@ pub fn get_restaurant_ids(restaurants: &[Restaurant]) -> Vec<Uuid> {
     ids
 }
 
-pub async fn get_dishes_for_site<'e, E>(ex: E, restaurant_ids: Vec<Uuid>) -> Result<Vec<Dish>>
+pub async fn get_dishes_for_site<'e, E>(
+    ex: E,
+    restaurant_ids: Vec<Uuid>,
+) -> Result<Vec<Dish>, Error>
 where
     E: Executor<'e, Database = Postgres>,
 {
@@ -393,10 +328,9 @@ where
     .bind(restaurant_ids)
     .fetch_all(ex)
     .await
-    .map_err(Error::from)
 }
 
-pub async fn list_countries(pg: &PgPool) -> Result<LunchData> {
+pub async fn list_countries(pg: &PgPool) -> Result<LunchData, Error> {
     // we don't need a transaction here, since we only make a single query
     Ok(LunchData::new().with_countries(get_countries(pg).await?))
 }
@@ -404,7 +338,7 @@ pub async fn list_countries(pg: &PgPool) -> Result<LunchData> {
 pub async fn list_cities_for_country_by_id(
     tx: &mut Transaction<'_>,
     country_id: Uuid,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let country = get_country(&mut **tx, country_id).await?;
     let cities = get_cities_for_country(&mut **tx, country_id).await?;
 
@@ -414,7 +348,7 @@ pub async fn list_cities_for_country_by_id(
 pub async fn list_cities_for_country_by_key(
     tx: &mut Transaction<'_>,
     key: SiteKey<'_>,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let country_id = get_site_relation(&mut **tx, key).await?.country_id;
     list_cities_for_country_by_id(tx, country_id).await
 }
@@ -422,7 +356,7 @@ pub async fn list_cities_for_country_by_key(
 pub async fn list_sites_for_city_by_id(
     tx: &mut Transaction<'_>,
     city_id: Uuid,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let city = get_city(&mut **tx, city_id).await?;
     let country = get_country(&mut **tx, city.country_id).await?;
     let sites = get_sites_for_city(&mut **tx, city_id).await?;
@@ -433,7 +367,7 @@ pub async fn list_sites_for_city_by_id(
 pub async fn list_sites_for_city_by_key(
     tx: &mut Transaction<'_>,
     key: SiteKey<'_>,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let city_id = get_site_relation(&mut **tx, key).await?.city_id;
     list_sites_for_city_by_id(tx, city_id).await
 }
@@ -441,7 +375,7 @@ pub async fn list_sites_for_city_by_key(
 pub async fn list_restaurants_for_site_by_id(
     tx: &mut Transaction<'_>,
     site_id: Uuid,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let site = get_site(&mut **tx, site_id).await?;
     let city = get_city(&mut **tx, site.city_id).await?;
     let country = get_country(&mut **tx, city.country_id).await?;
@@ -454,7 +388,7 @@ pub async fn list_restaurants_for_site_by_id(
 pub async fn list_restaurants_for_site_by_key(
     tx: &mut Transaction<'_>,
     key: SiteKey<'_>,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let site_id = get_site_relation(&mut **tx, key).await?.site_id;
     list_restaurants_for_site_by_id(tx, site_id).await
 }
@@ -462,7 +396,7 @@ pub async fn list_restaurants_for_site_by_key(
 pub async fn list_dishes_for_restaurant_by_id(
     tx: &mut Transaction<'_>,
     restaurant_id: Uuid,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let restaurant = get_restaurant(&mut **tx, restaurant_id).await?;
     let site = get_site(&mut **tx, restaurant.site_id).await?;
     let city = get_city(&mut **tx, site.city_id).await?;
@@ -485,7 +419,7 @@ pub async fn list_dishes_for_restaurant_by_id(
 pub async fn list_dishes_for_site_by_id(
     tx: &mut Transaction<'_>,
     site_id: Uuid,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let site = get_site(&mut **tx, site_id).await?;
     let city = get_city(&mut **tx, site.city_id).await?;
     let country = get_country(&mut **tx, city.country_id).await?;
@@ -500,7 +434,7 @@ pub async fn list_dishes_for_site_by_id(
 pub async fn list_dishes_for_site_by_key(
     tx: &mut Transaction<'_>,
     key: SiteKey<'_>,
-) -> Result<LunchData> {
+) -> Result<LunchData, Error> {
     let site_id = get_site_relation(&mut **tx, key).await?.site_id;
     list_dishes_for_site_by_id(tx, site_id).await
 }
@@ -509,7 +443,7 @@ pub async fn list_dishes_for_site_by_key(
 // LunchData instance, but that might be a bad idea if the DB gets big.
 // Let's wait and see of there's any need for it at some point.
 
-pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
+pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<(), Error> {
     trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
 
     let start = Instant::now();
@@ -565,5 +499,5 @@ pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<()> {
 
     trace!("DB update done in {:?}", duration);
 
-    tx.commit().await.map_err(Error::from)
+    tx.commit().await
 }

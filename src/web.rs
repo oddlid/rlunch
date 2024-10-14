@@ -3,6 +3,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::PgPool;
 use tracing::error;
 
@@ -21,6 +23,48 @@ impl ApiContext {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub enum ListQueryLevel {
+    Empty,
+    Country,
+    City,
+    Site,
+    Restaurant,
+    // Dish,
+}
+
+#[serde_as]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ListQuery {
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub country: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub city: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub site: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub restaurant: Option<String>,
+}
+
+impl ListQuery {
+    pub fn level(&self) -> ListQueryLevel {
+        if self.country.is_some()
+            && self.city.is_some()
+            && self.site.is_some()
+            && self.restaurant.is_some()
+        {
+            return ListQueryLevel::Restaurant;
+        } else if self.country.is_some() && self.city.is_some() && self.site.is_some() {
+            return ListQueryLevel::Site;
+        } else if self.country.is_some() && self.city.is_some() {
+            return ListQueryLevel::City;
+        } else if self.country.is_some() {
+            return ListQueryLevel::Country;
+        }
+        ListQueryLevel::Empty
+    }
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
