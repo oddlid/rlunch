@@ -12,10 +12,7 @@ use axum::{
     Json, Router,
 };
 use sqlx::PgPool;
-use std::{
-    future::Future,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tower_http::{catch_panic::CatchPanicLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::trace;
@@ -65,27 +62,27 @@ fn check_id(id: Uuid) -> Result<()> {
     Ok(())
 }
 
-async fn time_op<Fut>(op: impl Fn() -> Fut) -> Result<(Duration, LunchData)>
-where
-    Fut: Future<Output = Result<LunchData>>,
-{
-    let start = Instant::now();
-    let res = op().await?;
-    Ok((start.elapsed(), res))
-}
-
 async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json<LunchData>> {
     match q.level() {
-        ListQueryLevel::Restaurant => {
-            trace!("Level: Restaurant");
-            Err(anyhow::anyhow!("Not yet implemented").into())
+        // Until we have support for a restaurant level for SiteKey, we do the same for
+        // both restaurant and site level here
+        lvl @ ListQueryLevel::Site | lvl @ ListQueryLevel::Restaurant => {
+            trace!("Level: {:?}", lvl);
+            let start = Instant::now();
+            let res = db::list_dishes_for_site_by_key(
+                &mut ctx.get_tx().await?,
+                SiteKey::new(
+                    &q.country.unwrap_or_default(),
+                    &q.city.unwrap_or_default(),
+                    &q.site.unwrap_or_default(),
+                ),
+            )
+            .await?;
+            trace!("Fetched restaurant list in {:?}", start.elapsed());
+            Ok(Json(res))
         }
-        ListQueryLevel::Site => {
-            trace!("Level: Site");
-            Err(anyhow::anyhow!("Not yet implemented").into())
-        }
-        ListQueryLevel::City => {
-            trace!("Level: City");
+        lvl @ ListQueryLevel::City => {
+            trace!("Level: {:?}", lvl);
             let start = Instant::now();
             let res = db::list_sites_for_city_by_key(
                 &mut ctx.get_tx().await?,
@@ -99,24 +96,20 @@ async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json
             trace!("Fetched site list in {:?}", start.elapsed());
             Ok(Json(res))
         }
-        ListQueryLevel::Country => {
-            trace!("Level: Country");
-            let key_country = q.country.unwrap_or_default();
-            let (t, res) = time_op(|| async {
-                db::list_cities_for_country_by_key(
-                    &mut ctx.get_tx().await?,
-                    SiteKey::new(&key_country, "", ""),
-                )
-                .await
-                .map_err(super::Error::from)
-            })
+        lvl @ ListQueryLevel::Country => {
+            trace!("Level: {:?}", lvl);
+            let start = Instant::now();
+            let res = db::list_cities_for_country_by_key(
+                &mut ctx.get_tx().await?,
+                SiteKey::new(&q.country.unwrap_or_default(), "", ""),
+            )
             .await?;
-            trace!("Fetched city list in {:?}", t);
+            trace!("Fetched city list in {:?}", start.elapsed());
             Ok(Json(res))
         }
-        ListQueryLevel::Empty => {
-            trace!("Level: Empty");
-            Err(anyhow::anyhow!("Not yet implemented").into())
+        lvl @ ListQueryLevel::Empty => {
+            trace!("Level: {:?}", lvl);
+            list_countries(ctx).await
         }
     }
 }
