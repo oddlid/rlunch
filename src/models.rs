@@ -2,6 +2,7 @@
 // while the structs in the api sub-module are stripped versions of those intended for use in API
 // output, and similar, where uuids and mappings are not needed.
 
+use anyhow::Result;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -95,18 +96,18 @@ impl Id for Dish {
     }
 }
 
-impl From<api::Dish> for Dish {
-    fn from(dish: api::Dish) -> Self {
-        Self {
-            name: dish.name,
-            description: dish.description,
-            comment: dish.comment,
-            tags: dish.tags,
-            price: dish.price,
-            ..Default::default()
-        }
-    }
-}
+// impl From<api::Dish> for Dish {
+//     fn from(dish: api::Dish) -> Self {
+//         Self {
+//             name: dish.name,
+//             description: dish.description,
+//             comment: dish.comment,
+//             tags: dish.tags,
+//             price: dish.price,
+//             ..Default::default()
+//         }
+//     }
+// }
 
 /// DishRows maps a list of Dish into lists of all its fields.
 /// The intended use is together with Postgres' UNNEST, to be able to do batch insert of many
@@ -208,11 +209,8 @@ impl Restaurant {
 
     pub fn new_for_site(name: &str, site_id: Uuid) -> Self {
         Self {
-            restaurant_id: Uuid::new_v4(),
-            name: name.into(),
-            parsed_at: Local::now(),
             site_id,
-            ..Default::default()
+            ..Self::new(name)
         }
     }
 
@@ -241,20 +239,20 @@ impl Id for Restaurant {
     }
 }
 
-impl From<api::Restaurant> for Restaurant {
-    fn from(restaurant: api::Restaurant) -> Self {
-        Self {
-            name: restaurant.name,
-            comment: restaurant.comment,
-            address: restaurant.address,
-            url: restaurant.url,
-            map_url: restaurant.map_url,
-            parsed_at: restaurant.parsed_at,
-            dishes: restaurant.dishes.into(),
-            ..Default::default()
-        }
-    }
-}
+// impl From<api::Restaurant> for Restaurant {
+//     fn from(restaurant: api::Restaurant) -> Self {
+//         Self {
+//             name: restaurant.name,
+//             comment: restaurant.comment,
+//             address: restaurant.address,
+//             url: restaurant.url,
+//             map_url: restaurant.map_url,
+//             parsed_at: restaurant.parsed_at,
+//             dishes: restaurant.dishes.into(),
+//             ..Default::default()
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RestaurantRows {
@@ -325,8 +323,16 @@ pub struct Site {
 impl Site {
     pub fn new(name: &str) -> Self {
         Self {
+            site_id: Uuid::new_v4(),
             name: name.into(),
             ..Default::default()
+        }
+    }
+
+    pub fn new_for_city(name: &str, city_id: Uuid) -> Self {
+        Self {
+            city_id,
+            ..Self::new(name)
         }
     }
 
@@ -387,8 +393,16 @@ pub struct City {
 impl City {
     pub fn new(name: &str) -> Self {
         Self {
+            city_id: Uuid::new_v4(),
             name: name.into(),
             ..Default::default()
+        }
+    }
+
+    pub fn new_for_country(name: &str, country_id: Uuid) -> Self {
+        Self {
+            country_id,
+            ..Self::new(name)
         }
     }
 
@@ -496,6 +510,68 @@ impl LunchData {
         self.set_countries(countries);
         self
     }
+
+    pub fn build(
+        countries: Vec<Country>,
+        cities: Vec<City>,
+        sites: Vec<Site>,
+        restaurants: Vec<Restaurant>,
+        dishes: Vec<Dish>,
+    ) -> Self {
+        let mut restaurants: UuidMap<Restaurant> = restaurants.into();
+        for dish in dishes {
+            restaurants
+                .entry(dish.restaurant_id)
+                .and_modify(|restaurant| {
+                    restaurant.add(dish);
+                });
+        }
+
+        let mut sites: UuidMap<Site> = sites.into();
+        for (_, restaurant) in restaurants.drain() {
+            sites.entry(restaurant.site_id).and_modify(|site| {
+                site.add(restaurant);
+            });
+        }
+
+        let mut cities: UuidMap<City> = cities.into();
+        for (_, site) in sites.drain() {
+            cities.entry(site.city_id).and_modify(|city| {
+                city.add(site);
+            });
+        }
+
+        let mut countries: UuidMap<Country> = countries.into();
+        for (_, city) in cities.drain() {
+            countries.entry(city.country_id).and_modify(|country| {
+                country.add(city);
+            });
+        }
+
+        Self { countries }
+    }
+
+    pub fn get_site(&self, site_id: Uuid) -> Option<&Site> {
+        for country in self.countries.values() {
+            for city in country.cities.values() {
+                if let Some(site) = city.sites.get(&site_id) {
+                    return Some(site);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn into_site(mut self, site_id: Uuid) -> Result<Site> {
+        for (_, mut country) in self.countries.drain() {
+            for (_, mut city) in country.cities.drain() {
+                if let Some(site) = city.sites.remove(&site_id) {
+                    return Ok(site);
+                }
+            }
+        }
+        Err(anyhow::format_err!("site_id {site_id} not found"))
+    }
 }
 
 // #[cfg(test)]
@@ -513,8 +589,9 @@ impl LunchData {
 // }
 
 pub mod api {
-    /// This module has versions of structs from the parent, stripped for use during scraping and
-    /// for presentation in JSON API
+    // This module contains the same structs as the parent,
+    // where maps have been converted to vecs, for easier use in templates
+    // and possibly elsewhere
     use chrono::{DateTime, Local};
     use serde::{Deserialize, Serialize};
     use std::convert::From;
@@ -523,6 +600,8 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct Dish {
+        pub dish_id: Uuid,
+        pub restaurant_id: Uuid,
         /// Name of the dish, e.g. "meatballs"
         pub name: String,
         /// More details about the dish, e.g. "with spaghetti"
@@ -537,24 +616,17 @@ pub mod api {
         pub price: f32,
     }
 
-    impl Dish {
-        pub fn new(name: &str) -> Self {
-            Self {
-                name: name.into(),
-                ..Default::default()
-            }
-        }
-    }
-
     impl super::Id for Dish {
         fn id(&self) -> Uuid {
-            Uuid::new_v4()
+            self.dish_id
         }
     }
 
     impl From<super::Dish> for Dish {
         fn from(dish: super::Dish) -> Self {
             Self {
+                dish_id: dish.dish_id,
+                restaurant_id: dish.restaurant_id,
                 name: dish.name,
                 description: dish.description,
                 comment: dish.comment,
@@ -567,6 +639,8 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct Restaurant {
+        pub restaurant_id: Uuid,
+        pub site_id: Uuid,
         /// Name of restaurant
         pub name: String,
         /// Extra info
@@ -587,26 +661,26 @@ pub mod api {
         pub dishes: Vec<Dish>,
     }
 
-    impl Restaurant {
-        pub fn new(name: &str) -> Self {
-            Self {
-                name: name.into(),
-                parsed_at: Local::now(),
-                ..Default::default()
-            }
+    impl super::Id for Restaurant {
+        fn id(&self) -> Uuid {
+            self.restaurant_id
         }
     }
 
     impl From<super::Restaurant> for Restaurant {
         fn from(restaurant: super::Restaurant) -> Self {
+            let mut dishes: Vec<Dish> = restaurant.dishes.into_vec();
+            dishes.sort_by(|a, b| a.name.cmp(&b.name));
             Self {
+                restaurant_id: restaurant.restaurant_id,
+                site_id: restaurant.site_id,
                 name: restaurant.name,
                 comment: restaurant.comment,
                 address: restaurant.address,
                 url: restaurant.url,
                 map_url: restaurant.map_url,
                 parsed_at: restaurant.parsed_at,
-                dishes: restaurant.dishes.into_vec(),
+                dishes,
             }
         }
     }
@@ -614,6 +688,8 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct Site {
+        pub site_id: Uuid,
+        pub city_id: Uuid,
         pub name: String,
         pub url_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -621,22 +697,23 @@ pub mod api {
         pub restaurants: Vec<Restaurant>,
     }
 
-    impl Site {
-        pub fn new(name: &str) -> Self {
-            Self {
-                name: name.into(),
-                ..Default::default()
-            }
+    impl super::Id for Site {
+        fn id(&self) -> Uuid {
+            self.site_id
         }
     }
 
     impl From<super::Site> for Site {
         fn from(s: super::Site) -> Self {
+            let mut restaurants: Vec<Restaurant> = s.restaurants.into_vec();
+            restaurants.sort_by(|a, b| a.name.cmp(&b.name));
             Self {
+                site_id: s.site_id,
+                city_id: s.city_id,
                 name: s.name,
                 url_id: s.url_id,
                 comment: s.comment,
-                restaurants: s.restaurants.into_vec(),
+                restaurants,
             }
         }
     }
@@ -644,26 +721,29 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct City {
+        pub city_id: Uuid,
+        pub country_id: Uuid,
         pub name: String,
         pub url_id: String,
         pub sites: Vec<Site>,
     }
 
-    impl City {
-        pub fn new(name: &str) -> Self {
-            Self {
-                name: name.into(),
-                ..Default::default()
-            }
+    impl super::Id for City {
+        fn id(&self) -> Uuid {
+            self.city_id
         }
     }
 
     impl From<super::City> for City {
         fn from(c: super::City) -> Self {
+            let mut sites: Vec<Site> = c.sites.into_vec();
+            sites.sort_by(|a, b| a.name.cmp(&b.name));
             Self {
+                city_id: c.city_id,
+                country_id: c.country_id,
                 name: c.name,
                 url_id: c.url_id,
-                sites: c.sites.into_vec(),
+                sites,
             }
         }
     }
@@ -671,6 +751,7 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct Country {
+        pub country_id: Uuid,
         pub name: String,
         pub url_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -678,22 +759,22 @@ pub mod api {
         pub cities: Vec<City>,
     }
 
-    impl Country {
-        pub fn new(name: &str) -> Self {
-            Self {
-                name: name.into(),
-                ..Default::default()
-            }
+    impl super::Id for Country {
+        fn id(&self) -> Uuid {
+            self.country_id
         }
     }
 
     impl From<super::Country> for Country {
         fn from(c: super::Country) -> Self {
+            let mut cities: Vec<City> = c.cities.into_vec();
+            cities.sort_by(|a, b| a.name.cmp(&b.name));
             Self {
+                country_id: c.country_id,
                 name: c.name,
                 url_id: c.url_id,
                 currency_suffix: c.currency_suffix,
-                cities: c.cities.into_vec(),
+                cities,
             }
         }
     }
@@ -701,7 +782,6 @@ pub mod api {
     #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
     #[serde(default)]
     pub struct LunchData {
-        /// List of current countries
         pub countries: Vec<Country>,
     }
 
@@ -713,9 +793,9 @@ pub mod api {
 
     impl From<super::LunchData> for LunchData {
         fn from(l: super::LunchData) -> Self {
-            Self {
-                countries: l.countries.into_vec(),
-            }
+            let mut countries: Vec<Country> = l.countries.into_vec();
+            countries.sort_by(|a, b| a.name.cmp(&b.name));
+            Self { countries }
         }
     }
 }

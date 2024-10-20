@@ -372,6 +372,40 @@ pub async fn list_sites_for_city_by_key(
     list_sites_for_city_by_id(tx, city_id).await
 }
 
+pub async fn list_all_sites(tx: &mut Transaction<'_>) -> Result<LunchData, Error> {
+    let sites: Vec<Site> = sqlx::query_as(
+        r#"
+            select * from site
+        "#,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let cities: Vec<City> = sqlx::query_as(
+        r#"
+            select * from city
+        "#,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let countries: Vec<Country> = sqlx::query_as(
+        r#"
+            select * from country
+        "#,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(LunchData::build(
+        countries,
+        cities,
+        sites,
+        Vec::new(),
+        Vec::new(),
+    ))
+}
+
 pub async fn list_restaurants_for_site_by_id(
     tx: &mut Transaction<'_>,
     site_id: Uuid,

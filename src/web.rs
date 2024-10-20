@@ -3,10 +3,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use compact_str::CompactString;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::PgPool;
 use tracing::error;
+use uuid::Uuid;
 
 pub mod api;
 pub mod html;
@@ -14,6 +16,7 @@ pub mod html;
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     pub db: PgPool,
+    pub gtag: CompactString,
 }
 
 impl ApiContext {
@@ -100,4 +103,11 @@ impl IntoResponse for Error {
         }
         (self.status_code(), self.to_string()).into_response()
     }
+}
+
+fn check_id(id: Uuid) -> Result<()> {
+    if id.is_nil() {
+        return Err(Error::NotFound);
+    }
+    Ok(())
 }

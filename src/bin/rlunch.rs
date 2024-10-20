@@ -1,10 +1,11 @@
 use anyhow::Result;
 use compact_str::CompactString;
-use rlunch::{cli, db, scrape, web::api};
+use rlunch::{
+    cli, scrape,
+    web::{api, html},
+};
 use sqlx::PgPool;
-use std::time::Instant;
 use tracing::{trace, warn};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,9 +38,7 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(pool, listen).await?,
             cli::ServeCommands::Admin => run_server_admin(pool, listen).await?,
-            cli::ServeCommands::Html { backend_addr } => {
-                run_server_html(pool, listen, backend_addr).await?
-            }
+            cli::ServeCommands::Html { gtag } => run_server_html(pool, listen, gtag).await?,
         },
     }
     Ok(())
@@ -51,7 +50,7 @@ async fn run_server_json(pg: PgPool, addr: CompactString) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_admin(pg: PgPool, addr: CompactString) -> Result<()> {
+async fn run_server_admin(_pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start ADMIN server on addr: {addr}");
 
     // temp, just testing
@@ -69,11 +68,6 @@ async fn run_server_admin(pg: PgPool, addr: CompactString) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_html(
-    _pg: PgPool,
-    addr: CompactString,
-    backend_addr: CompactString,
-) -> Result<()> {
-    warn!("TODO: Actually start HTML server on addr: {addr}, with backend on: {backend_addr}");
-    Ok(())
+async fn run_server_html(pg: PgPool, addr: CompactString, gtag: CompactString) -> Result<()> {
+    html::serve(pg, &addr, gtag).await
 }

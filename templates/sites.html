@@ -1,0 +1,33 @@
+{% extends "layout.html" %} 
+{% block title %}Site list{% endblock %} 
+{% block content %}
+{% filter indent(6, true) | safe %}
+
+<div class="w-100 p-3">&nbsp;</div>
+<h1 class="pghdr h5 text-center">Choose site</h1>
+<div class="w-100 pb-3">&nbsp;</div>
+<div class="w-100 pb-3">&nbsp;</div>
+<ul class="country-list">
+{% for country in data.countries %}
+  <li class="country-name">{{ country.name }}</li>
+  <ul class="city-list">
+  {% for city in country.cities %}
+    <li class="city-name">{{ city.name }}</li>
+    <ul class="site-list">
+    {% for site in city.sites %}
+      <li class="site-name">
+        <a href="/site/{{ site.site_id }}">{{ site.name }}</a>
+        {% if site.comment %}
+        <span class="site-comment">({{ site.comment }})</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+    </ul>
+  {% endfor %}
+  </ul>
+{% endfor %}
+</ul>
+<div class="w-100 pb-3">&nbsp;</div>
+
+{% endfilter %}
+{% endblock %}

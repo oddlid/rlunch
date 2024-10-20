@@ -1,0 +1,56 @@
+{% extends "layout.html" %} 
+{% block title %}Dishes for site {{ site.name }}{% endblock %} 
+{% block content %}
+{% filter indent(6, true) | safe %}
+<div class="w-100 p-3">&nbsp;</div>
+<h1 class="pghdr h5 text-center"><a href="/">Menu</a> @ {{ site.name }}</h1>
+<div class="toggledetails text-center mt-3" onclick="toggledetail();">[ Show / hide all ]</div>
+<div class="w-100 pb-3">&nbsp;</div>
+<div class="w-100 pb-3">&nbsp;</div>
+
+{% for restaurant in site.restaurants %}
+  <div class="restaurant m-2">
+    <details open class="pb-3">
+      <summary>
+        <h2 class="name h6">
+          <a href="{{ restaurant.url }}">{{ restaurant.name }}</a>
+          {% if restaurant.address and restaurant.map_url %}
+          - <a href="{{ restaurant.map_url }}" target="_blank">{{ restaurant.address }}</a>
+          {% endif %}
+        </h2>
+      </summary>
+      <div class="parsed">@({{ restaurant.parsed_at }})</div>
+      <div class="dishes ml-2 p-2 shadow rounded">
+        <table class="dish">
+          {% for dish in restaurant.dishes %}
+          <tr class="extra-info" colspan="2">
+            <td class="tags d-inline">
+              {% if dish.tags %}
+              [{{ dish.tags | join(", ")}}]
+              {% else %}
+              &nbsp;
+              {% endif %}
+              {% if dish.comment %}
+              <span class="dish-comment">({{ dish.comment }})</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr class="dish">
+            <td class="dish">
+              <div class="m-2">
+                <span class="name h6 d-inline">{{ dish.name }}</span>
+                <span class="desc d-inline">{{ dish.description }}</span>
+                <span class="price">{{ dish.price }} <span class="currency-suffix">{{ currency_suffix }}</span></span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </details>
+  </div>
+
+{% endfor %}
+
+{% endfilter %}
+{% endblock %}

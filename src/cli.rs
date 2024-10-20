@@ -66,8 +66,8 @@ pub enum ServeCommands {
     Json,
     Html {
         /// Address of the backend JSON server instance
-        #[arg(short, long, default_value_t = CompactString::from("127.0.0.1:20666"))]
-        backend_addr: CompactString,
+        #[arg(short, long, default_value_t = CompactString::from(""))]
+        gtag: CompactString,
     },
     Admin,
 }

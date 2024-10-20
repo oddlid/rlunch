@@ -1,4 +1,4 @@
-use super::{ApiContext, ListQuery, ListQueryLevel, Result};
+use super::{check_id, ApiContext, ListQuery, ListQueryLevel, Result};
 use crate::{
     db::{self, SiteKey},
     models::LunchData,
@@ -11,6 +11,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use compact_str::CompactString;
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
@@ -22,7 +23,10 @@ pub async fn serve(pg: PgPool, addr: &str) -> anyhow::Result<()> {
     trace!(addr, "Starting HTTP API server...");
     axum::serve(
         TcpListener::bind(addr).await?,
-        api_router(ApiContext { db: pg }),
+        api_router(ApiContext {
+            db: pg,
+            gtag: CompactString::from(""),
+        }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await
@@ -53,13 +57,6 @@ fn router() -> Router<ApiContext> {
         )
         .route("/dishes/site/:site_id", get(list_dishes_for_site))
         .route("/list/", get(list))
-}
-
-fn check_id(id: Uuid) -> Result<()> {
-    if id.is_nil() {
-        return Err(super::Error::NotFound);
-    }
-    Ok(())
 }
 
 async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json<LunchData>> {
