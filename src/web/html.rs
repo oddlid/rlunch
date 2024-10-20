@@ -11,22 +11,25 @@ use axum::{
     routing::get,
     Router,
 };
+use axum_embed::ServeEmbed;
 use compact_str::CompactString;
 use minijinja::{context, Environment};
 use minijinja_autoreload::AutoReloader;
+use rust_embed::RustEmbed;
 use serde::Serialize;
 use sqlx::PgPool;
 use std::time::Duration;
 use std::{path::PathBuf, sync::LazyLock};
 use tokio::net::TcpListener;
 use tower_http::{
-    catch_panic::CatchPanicLayer,
-    services::{ServeDir, ServeFile},
-    timeout::TimeoutLayer,
-    trace::TraceLayer,
+    catch_panic::CatchPanicLayer, services::ServeFile, timeout::TimeoutLayer, trace::TraceLayer,
 };
 use tracing::trace;
 use uuid::Uuid;
+
+#[derive(RustEmbed, Clone)]
+#[folder = "static/"]
+struct Assets;
 
 static LOADER: LazyLock<AutoReloader> = LazyLock::new(|| {
     #[allow(unused_variables)]
@@ -72,7 +75,7 @@ fn router() -> Router<ApiContext> {
 
 fn html_router(ctx: ApiContext) -> Router {
     Router::new()
-        .nest_service("/static", ServeDir::new("static"))
+        .nest_service("/static", ServeEmbed::<Assets>::new())
         .nest_service("/favicon.ico", ServeFile::new("static/favicon.ico"))
         .merge(router())
         .layer((
