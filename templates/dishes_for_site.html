@@ -15,11 +15,14 @@
         <h2 class="name h6">
           <a href="{{ restaurant.url }}">{{ restaurant.name }}</a>
           {% if restaurant.address and restaurant.map_url %}
-          - <a href="{{ restaurant.map_url }}" target="_blank">{{ restaurant.address }}</a>
+          &nbsp;&nbsp;
+          <a href="{{ restaurant.map_url }}" target="_blank">
+            <img src="/static/map_64.png" width="24" height="24" alt="{{ restaurant.address }}" />
+          </a>
           {% endif %}
         </h2>
       </summary>
-      <div class="parsed">@({{ restaurant.parsed_at }})</div>
+      <div class="parsed">Updated @ {{ restaurant.parsed_at | datetimeformat(format="short", tz="Europe/Stockholm") }}</div>
       <div class="dishes ml-2 p-2 shadow rounded">
         <table class="dish">
           {% for dish in restaurant.dishes %}

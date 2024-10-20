@@ -20,7 +20,10 @@ use std::time::Duration;
 use std::{path::PathBuf, sync::LazyLock};
 use tokio::net::TcpListener;
 use tower_http::{
-    catch_panic::CatchPanicLayer, services::ServeDir, timeout::TimeoutLayer, trace::TraceLayer,
+    catch_panic::CatchPanicLayer,
+    services::{ServeDir, ServeFile},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
 };
 use tracing::trace;
 use uuid::Uuid;
@@ -30,6 +33,7 @@ static LOADER: LazyLock<AutoReloader> = LazyLock::new(|| {
     AutoReloader::new(move |notifier| {
         let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates");
         let mut env = Environment::new();
+        minijinja_contrib::add_to_environment(&mut env);
         env.set_trim_blocks(true);
         env.set_lstrip_blocks(true);
 
@@ -68,8 +72,9 @@ fn router() -> Router<ApiContext> {
 
 fn html_router(ctx: ApiContext) -> Router {
     Router::new()
-        .merge(router())
         .nest_service("/static", ServeDir::new("static"))
+        .nest_service("/favicon.ico", ServeFile::new("static/favicon.ico"))
+        .merge(router())
         .layer((
             TraceLayer::new_for_http().on_failure(()),
             TimeoutLayer::new(Duration::from_secs(30)),

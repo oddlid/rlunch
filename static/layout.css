@@ -1,20 +1,3 @@
-summary::-webkit-details-marker {
-  display: none;
-}
-summary {
-  outline-style: none;
-}
-summary:focus {
-  outline-style: none;
-}
-summary:after {
-  content: "˃";
-  font-size: 1.2rem;
-  margin-left: 0.6rem;
-}
-details[open] summary:after {
-  content: "˅";
-}
 a {
   color: #669bbc;
 }
@@ -69,7 +52,9 @@ div#content {
   background-size: 100% 8rem;
   width: 95%;
 }
-
 .dlistitem {
   margin-left: 4rem;
+}
+div.icon-attrib {
+  font-size: 65%;
 }
