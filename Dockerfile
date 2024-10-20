@@ -7,9 +7,12 @@ ENV RUSTFLAGS="-C target-cpu=native"
 # ENV CARGO_BUILD_TARGET="x86_64-unknown-linux-musl"
 RUN apk add --no-cache --update musl-dev alpine-sdk openssl-dev && rm -rf /var/cache/apk/*
 
-WORKDIR /usr/src/rlunch
+WORKDIR /usr/local/src/rlunch
 COPY . .
-RUN cargo install --path .
+COPY ./.sqlx ./
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/usr/local/src/rlunch/target \
+  cargo build --release --bin rlunch
 
 FROM alpine:latest
 RUN apk add --no-cache --update \
@@ -18,7 +21,7 @@ RUN apk add --no-cache --update \
   && \
   rm -rf /var/cache/apk/*
 RUN adduser -D -u 1000 lunchsrv
-COPY --from=builder /usr/local/cargo/bin/rlunch /usr/local/bin/rlunch
+COPY --from=builder /usr/local/src/rlunch/target/release/rlunch /usr/local/bin/rlunch
 RUN chown lunchsrv /usr/local/bin/rlunch && chmod 555 /usr/local/bin/rlunch
 USER lunchsrv
 CMD ["rlunch"]
