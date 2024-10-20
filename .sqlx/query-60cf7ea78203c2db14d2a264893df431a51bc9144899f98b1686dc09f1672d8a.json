@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into dish (restaurant_id, dish_id, dish_name, description, comment, price, tags)\n            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[], $7::text[])\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Float4Array",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60cf7ea78203c2db14d2a264893df431a51bc9144899f98b1686dc09f1672d8a"
+}
