@@ -82,7 +82,7 @@ humantime = { version = "2.1" }
 minijinja-embed = { version = "2.3" }
 
 # Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release
-# [profile.release]
-# strip = true
-# lto = true
-# codegen-units = 1
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
