@@ -76,7 +76,7 @@ with ins_country as (
   insert into city (country_id, name, url_id)
   values (
     (select country_id from ins_country),
-    'Gothenburg',
+    'Göteborg',
     'gbg'
   )
   returning *
@@ -93,5 +93,5 @@ values
     (select city_id from ins_city),
     'Majorna',
     'maj',
-    'Hipster Hell'
+    'Hipster Heaven'
   );

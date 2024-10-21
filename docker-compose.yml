@@ -1,15 +1,23 @@
+volumes:
+  pg_data:
+
 services:
   db:
     image: postgres:alpine
     container_name: pg
     restart: always
     shm_size: 128mb
+    volumes:
+      - type: volume
+        source: pg_data
+        target: /var/lib/postgresql/data
     ports:
       - "5432:5432/tcp"
     environment:
       TZ: Europe/Stockholm
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: test
+      PGDATA: /var/lib/postgresql/data/pgdata
 
   caddy:
     image: oddlid/caddy:latest
@@ -23,3 +31,13 @@ services:
       - "8080:8080/tcp"
     environment:
       TZ: Europe/Stockholm
+
+  rlunch_html:
+    image: oddlid/rlunch:latest
+    container_name: rlunch_html
+    command: rlunch serve -l 0.0.0.0:8081 html --gtag UA-126840341-2
+    ports:
+      - "8081:8081/tcp"
+    environment:
+      TZ: Europe/Stockholm
+      DATABASE_URL: postgresql://postgres:test@pg/rlunch
