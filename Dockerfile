@@ -12,9 +12,13 @@ RUN apk add --no-cache --update \
 
 WORKDIR /app
 COPY . .
+# It seems that since the target directory is mounted as cache, it won't be available
+# in the next stage, and hence we need to move the binary to another location in order to be
+# able to copy it in the next stage
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-  --mount=type=cache,target=/usr/local/src/rlunch/target \
-  cargo build --features=bundled --release --bin rlunch
+  --mount=type=cache,target=/app/target \
+  cargo build --features=bundled --release --bin rlunch \
+  && mv /app/target/release/rlunch /tmp/
 
 FROM alpine:latest
 RUN apk add --no-cache --update \
@@ -23,7 +27,7 @@ RUN apk add --no-cache --update \
   && \
   rm -rf /var/cache/apk/*
 RUN adduser -D -u 1000 lunchsrv
-COPY --from=builder /app/target/release/rlunch /usr/local/bin/rlunch
+COPY --from=builder /tmp/rlunch /usr/local/bin/rlunch
 RUN chown lunchsrv /usr/local/bin/rlunch && chmod 555 /usr/local/bin/rlunch
 USER lunchsrv
 CMD ["rlunch"]

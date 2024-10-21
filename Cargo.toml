@@ -26,12 +26,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 axum = { version = "0.7" }
 axum-embed = { version = "0.1" }
 rust-embed = { version = "8.5" }
-tower-http = { version = "0.6", features = [
-  "catch-panic",
-  "timeout",
-  "trace",
-  "fs",
-] }
+tower-http = { version = "0.6", features = ["catch-panic", "timeout", "trace"] }
 minijinja = { version = "2.3", features = ["loader"] }
 minijinja-embed = { version = "2.3" }
 minijinja-autoreload = { version = "2.3" }
@@ -43,7 +38,12 @@ url = "2.5"
 urlencoding = { version = "2.1" }
 uuid = { version = "1.10", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", default-features = false, features = [
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time",
+] }
 tokio-cron-scheduler = { version = "0.13", features = ["log", "signal"] }
 clap = { version = "4.2.1", features = ["derive", "env"] }
 clap-verbosity-flag = "2.2"
@@ -90,3 +90,6 @@ minijinja-embed = { version = "2.3" }
 strip = true
 lto = true
 codegen-units = 1
+
+[profile.dev]
+split-debuginfo = "unpacked"
