@@ -7,6 +7,11 @@ use rlunch::{
 use sqlx::PgPool;
 use tracing::{trace, warn};
 
+// Use Jemalloc only for musl-64 bits platforms
+#[cfg(all(target_env = "musl", target_pointer_width = "64"))]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     if let Err(e) = dotenvy::dotenv() {
@@ -52,17 +57,6 @@ async fn run_server_json(pg: PgPool, addr: CompactString) -> Result<()> {
 // #[tracing::instrument]
 async fn run_server_admin(_pg: PgPool, addr: CompactString) -> Result<()> {
     warn!("TODO: Actually start ADMIN server on addr: {addr}");
-
-    // temp, just testing
-    // let start = Instant::now();
-    // let ld = db::list_dishes_for_site_by_id(
-    //     &pg,
-    //     Uuid::parse_str("51a3b3cb-b120-4f7a-a8af-8d91f9a94f68")?,
-    // )
-    // .await?;
-    // let duration = start.elapsed();
-    // trace!("Query ran in {:?}", duration);
-    // dbg!(ld);
 
     Ok(())
 }

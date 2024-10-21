@@ -79,6 +79,9 @@ humantime = { version = "2.1" }
 # scopeguard = { version = "1.2" }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
 
+[target.'cfg(all(target_env = "musl", target_pointer_width = "64"))'.dependencies.jemallocator]
+version = "0.5"
+
 [build-dependencies]
 minijinja-embed = { version = "2.3" }
 
