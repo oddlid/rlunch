@@ -1,6 +1,11 @@
+/// This scraper gets all info for the whole site from a single website,
+/// so we do everything in a single module.
+/// Other scrapers might need to have a submodule for each restaurant,
+/// to not make the code too unwieldy.
+///
 use crate::{
     models::{Dish, Restaurant},
-    scrape::{get, get_client, RestaurantScraper, ScrapeResult},
+    scrape::{self, RestaurantScraper, ScrapeResult},
     util::*,
 };
 use anyhow::{anyhow, bail, Result};
@@ -15,12 +20,12 @@ use uuid::Uuid;
 
 // const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
 // https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe
-const SCRAPE_URL: &str = "http://localhost:8080";
-const ATTR_CLASS: &str = "class";
-const ATTR_TITLE: &str = "title";
-const ATTR_HREF: &str = "href";
-const MAPS_DOMAIN: &str = "maps.google.com";
-const ERR_INVALID_HTML: &str = "Invalid HTML";
+static SCRAPE_URL: &str = "http://localhost:8080";
+static ATTR_CLASS: &str = "class";
+static ATTR_TITLE: &str = "title";
+static ATTR_HREF: &str = "href";
+static MAPS_DOMAIN: &str = "maps.google.com";
+static ERR_INVALID_HTML: &str = "Invalid HTML";
 
 lazy_static! {
     static ref SEL_CONTENT: Selector = sel("div.content");
@@ -32,7 +37,7 @@ lazy_static! {
     static ref SEL_ADDR: Selector = sel("div > h3 + p");
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct LHScraper {
     client: Client,
     url: &'static str,
@@ -49,17 +54,17 @@ struct AddrInfo {
 }
 
 impl LHScraper {
-    pub fn new(site_id: Uuid, request_delay: Duration) -> Self {
+    pub fn new(client: Client, site_id: Uuid, request_delay: Duration) -> Self {
         Self {
             url: SCRAPE_URL, // TODO: evaluate if this should rather be passed in
-            client: get_client().unwrap(),
+            client,
             site_id,
             request_delay,
         }
     }
 
     async fn get(&self, url: &str) -> Result<String> {
-        get(&self.client, url).await
+        scrape::get(&self.client, url).await
     }
 
     async fn get_addr_info(&self, url: &str) -> Result<AddrInfo> {

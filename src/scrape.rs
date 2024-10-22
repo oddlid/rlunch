@@ -24,7 +24,7 @@ pub trait RestaurantScraper {
     fn name(&self) -> &'static str;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ScrapeResult {
     pub site_id: Uuid,
     pub restaurants: Vec<models::Restaurant>,
@@ -213,8 +213,11 @@ async fn setup_scrapers(
 ) -> Result<task::JoinSet<()>> {
     let mut set = task::JoinSet::new();
 
+    let client = get_client()?;
+
     set.spawn(run_scraper(
         scrapers::se::gbg::lh::LHScraper::new(
+            client.clone(),
             db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "lh"))
                 .await?
                 .site_id,
@@ -225,6 +228,7 @@ async fn setup_scrapers(
     ));
     set.spawn(run_scraper(
         scrapers::se::gbg::majorna::MajornaScraper::new(
+            client.clone(),
             db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "maj"))
                 .await?
                 .site_id,
