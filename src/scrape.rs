@@ -226,17 +226,18 @@ async fn setup_scrapers(
         cmds.subscribe(),
         results.clone(),
     ));
-    set.spawn(run_scraper(
-        scrapers::se::gbg::majorna::MajornaScraper::new(
-            client.clone(),
-            db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "maj"))
-                .await?
-                .site_id,
-            request_delay,
-        ),
-        cmds.subscribe(),
-        results.clone(),
-    ));
+    // Disabled until scraping architechture has been redesigned
+    // set.spawn(run_scraper(
+    //     scrapers::se::gbg::majorna::MajornaScraper::new(
+    //         client.clone(),
+    //         db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "maj"))
+    //             .await?
+    //             .site_id,
+    //         request_delay,
+    //     ),
+    //     cmds.subscribe(),
+    //     results.clone(),
+    // ));
 
     Ok(set)
 }

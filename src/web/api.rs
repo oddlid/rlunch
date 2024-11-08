@@ -1,7 +1,7 @@
 use super::{check_id, ApiContext, ListQuery, ListQueryLevel, Result};
 use crate::{
     db::{self, SiteKey},
-    models::LunchData,
+    models::api::LunchData,
     signals::shutdown_signal,
 };
 use anyhow::Context;
@@ -76,7 +76,7 @@ async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json
             )
             .await?;
             trace!("Fetched restaurant list in {:?}", start.elapsed());
-            Ok(Json(res))
+            Ok(Json(res.into()))
         }
         lvl @ ListQueryLevel::City => {
             trace!("Level: {:?}", lvl);
@@ -91,7 +91,7 @@ async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json
             )
             .await?;
             trace!("Fetched site list in {:?}", start.elapsed());
-            Ok(Json(res))
+            Ok(Json(res.into()))
         }
         lvl @ ListQueryLevel::Country => {
             trace!("Level: {:?}", lvl);
@@ -102,7 +102,7 @@ async fn list(ctx: State<ApiContext>, Query(q): Query<ListQuery>) -> Result<Json
             )
             .await?;
             trace!("Fetched city list in {:?}", start.elapsed());
-            Ok(Json(res))
+            Ok(Json(res.into()))
         }
         lvl @ ListQueryLevel::Empty => {
             trace!("Level: {:?}", lvl);
@@ -116,7 +116,7 @@ async fn list_countries(ctx: State<ApiContext>) -> Result<Json<LunchData>> {
     let res = db::list_countries(&ctx.db).await?;
     let duration = start.elapsed();
     trace!("Fetched country list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }
 
 async fn list_cities(
@@ -128,7 +128,7 @@ async fn list_cities(
     let res = db::list_cities_for_country_by_id(&mut ctx.get_tx().await?, country_id).await?;
     let duration = start.elapsed();
     trace!("Fetched city list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }
 
 async fn list_sites(ctx: State<ApiContext>, Path(city_id): Path<Uuid>) -> Result<Json<LunchData>> {
@@ -137,7 +137,7 @@ async fn list_sites(ctx: State<ApiContext>, Path(city_id): Path<Uuid>) -> Result
     let res = db::list_sites_for_city_by_id(&mut ctx.get_tx().await?, city_id).await?;
     let duration = start.elapsed();
     trace!("Fetched site list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }
 
 async fn list_restaurants(
@@ -149,7 +149,7 @@ async fn list_restaurants(
     let res = db::list_restaurants_for_site_by_id(&mut ctx.get_tx().await?, site_id).await?;
     let duration = start.elapsed();
     trace!("Fetched restaurant list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }
 
 async fn list_dishes_for_restaurant(
@@ -161,7 +161,7 @@ async fn list_dishes_for_restaurant(
     let res = db::list_dishes_for_restaurant_by_id(&mut ctx.get_tx().await?, restaurant_id).await?;
     let duration = start.elapsed();
     trace!("Fetched dishes for restaurant list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }
 
 async fn list_dishes_for_site(
@@ -173,5 +173,5 @@ async fn list_dishes_for_site(
     let res = db::list_dishes_for_site_by_id(&mut ctx.get_tx().await?, site_id).await?;
     let duration = start.elapsed();
     trace!("Fetched dishes for site list in {:?}", duration);
-    Ok(Json(res))
+    Ok(Json(res.into()))
 }

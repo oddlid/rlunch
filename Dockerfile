@@ -8,6 +8,7 @@ ENV SQLX_OFFLINE="true"
 RUN apk add --no-cache --update \
   alpine-sdk \
   musl-dev \
+  tzdata \
   && rm -rf /var/cache/apk/*
 
 WORKDIR /app
@@ -21,6 +22,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
   && mv /app/target/release/rlunch /tmp/
 
 FROM alpine:latest
+LABEL maintainer="Odd E. Ebbesen <oddebb@gmail.com>"
 RUN apk add --no-cache --update \
   ca-certificates \
   tzdata \

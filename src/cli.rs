@@ -2,10 +2,13 @@ use anyhow::{Error, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{ErrorLevel, LevelFilter, Verbosity};
 use compact_str::CompactString;
+use shadow_rs::shadow;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::io;
 use tracing_subscriber::filter::LevelFilter as TFilter;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+
+shadow!(build);
 
 #[derive(Debug, Clone, Default, ValueEnum)]
 pub enum LogFormat {
@@ -17,7 +20,7 @@ pub enum LogFormat {
 }
 
 #[derive(Debug, Clone, Parser)]
-#[command(author, version, about, long_about = None, propagate_version = true)]
+#[command(author, version, about, long_version = build::CLAP_LONG_VERSION, propagate_version = true)]
 pub struct Cli {
     /// Log level verbosity
     #[command(flatten)]

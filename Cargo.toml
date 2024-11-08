@@ -48,8 +48,8 @@ tokio-cron-scheduler = { version = "0.13", features = ["log", "signal"] }
 clap = { version = "4.2.1", features = ["derive", "env"] }
 clap-verbosity-flag = "2.2"
 anyhow = "1.0"
-thiserror = { version = "1.0" }
-scraper = "0.20"
+thiserror = { version = "2.0" }
+scraper = "0.21"
 lazy_static = "1.5"
 compact_str = { version = "0.8", features = ["serde", "markup"] }
 nom = { version = "7.1" }
@@ -75,6 +75,10 @@ sqlx = { version = "0.8", features = [
 ] }
 dotenvy = { version = "0.15" }
 humantime = { version = "2.1" }
+rust_decimal = { version = "1.36", default-features = false, features = [
+  "std",
+] }
+shadow-rs = { version = "0.35" }
 
 # scopeguard = { version = "1.2" }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
@@ -84,6 +88,7 @@ version = "0.5"
 
 [build-dependencies]
 minijinja-embed = { version = "2.3" }
+shadow-rs = { version = "0.35" }
 
 # Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release
 [profile.release]

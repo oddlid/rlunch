@@ -70,7 +70,7 @@ select trigger_updated_at('dish');
 
 with ins_country as (
   insert into country (name, url_id, currency_suffix)
-  values ('Sweden', 'se', 'kr')
+  values ('Sweden', 'se', 'SEK')
   returning *
 ), ins_city as (
   insert into city (country_id, name, url_id)
@@ -88,10 +88,10 @@ values
     'Lindholmen',
     'lh',
     'GBG Silicon Valley'
-  ),
-  (
-    (select city_id from ins_city),
-    'Majorna',
-    'maj',
-    'Hipster Heaven'
   );
+--  (
+--    (select city_id from ins_city),
+--    'Majorna',
+--    'maj',
+--    'Hipster Heaven'
+--  );

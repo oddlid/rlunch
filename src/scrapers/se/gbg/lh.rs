@@ -18,9 +18,9 @@ use tracing::{error, trace};
 use url::Url;
 use uuid::Uuid;
 
-// const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
-// https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe
-static SCRAPE_URL: &str = "http://localhost:8080";
+// static SCRAPE_URL: &str = "http://localhost:8080";
+const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
+static SCRAPE_URL: &str = "https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe";
 static ATTR_CLASS: &str = "class";
 static ATTR_TITLE: &str = "title";
 static ATTR_HREF: &str = "href";
@@ -223,15 +223,19 @@ fn get_dish_name_and_desc(e: &ElementRef) -> (Option<String>, Option<String>) {
 }
 
 fn get_restaurant_link(name: &str) -> String {
+    // Local dev version
+    // format!(
+    //     "{}/{}",
+    //     SCRAPE_URL,
+    //     slugify!(&str::replace(name, "'", ""), stop_words = "by,of")
+    // )
+
     // slugify will replace apostrophes with dashes, so we need to strip them out first in order to
     // get the same slugs as lindholmen.se uses.
     // They also seem to remove certain words, like "by" and "of", so we strip those as well.
-    // format!("{}{}", URL_PREFIX, slugify!(&str::replace(name, "'", ""), stop_words = "by,of")))
-
-    // Local dev version
     format!(
-        "{}/{}",
-        SCRAPE_URL,
+        "{}{}",
+        URL_PREFIX,
         slugify!(&str::replace(name, "'", ""), stop_words = "by,of")
     )
 }

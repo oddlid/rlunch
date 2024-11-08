@@ -1,2 +1,2 @@
 pub mod lh;
-pub mod majorna;
+// pub mod majorna;

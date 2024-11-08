@@ -15,6 +15,7 @@ use axum_embed::ServeEmbed;
 use compact_str::CompactString;
 use minijinja::{context, Environment};
 use minijinja_autoreload::AutoReloader;
+use rust_decimal::prelude::*;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use sqlx::PgPool;
@@ -29,6 +30,14 @@ use uuid::Uuid;
 #[folder = "static/"]
 struct Assets;
 
+// filter function for template to display price in a more normal human format
+fn strip_zeros(v: f32) -> String {
+    if let Some(d) = Decimal::from_f32(v) {
+        return d.normalize().to_string();
+    }
+    format!("{:.2}", v)
+}
+
 static LOADER: LazyLock<AutoReloader> = LazyLock::new(|| {
     #[allow(unused_variables)]
     AutoReloader::new(move |notifier| {
@@ -37,6 +46,7 @@ static LOADER: LazyLock<AutoReloader> = LazyLock::new(|| {
         minijinja_contrib::add_to_environment(&mut env);
         env.set_trim_blocks(true);
         env.set_lstrip_blocks(true);
+        env.add_filter("stripz", strip_zeros);
 
         #[cfg(feature = "bundled")]
         {
@@ -69,6 +79,9 @@ fn router() -> Router<ApiContext> {
     Router::new()
         .route("/", get(list_sites))
         .route("/site/:site_id", get(list_dishes_for_site))
+        // I found out that I had solved this in the Go version by letting the Caddy
+        // frontend handle the rewrite. But it doesn't hurt to have this here as well, so I know
+        // how to du it in just Rust.
         .route(
             "/favicon.ico",
             get(|| async { Redirect::permanent("/static/favicon.ico") }),
@@ -115,7 +128,7 @@ async fn list_dishes_for_site(
                 return CompactString::from(v);
             }
         }
-        CompactString::from(",-")
+        CompactString::from("")
     }();
     let site: Site = data.into_site(site_id)?.into();
 

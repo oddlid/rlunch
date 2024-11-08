@@ -43,7 +43,7 @@
               <div class="m-2">
                 <span class="name h6 d-inline">{{ dish.name }}</span>
                 <span class="desc d-inline">{{ dish.description }}</span>
-                <span class="price">{{ dish.price }} <span class="currency-suffix">{{ currency_suffix }}</span></span>
+                <span class="price">{{ dish.price | stripz }} <span class="currency-suffix">{{ currency_suffix }}</span></span>
               </div>
             </td>
           </tr>
