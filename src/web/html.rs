@@ -130,6 +130,8 @@ async fn list_dishes_for_site(
         }
         CompactString::from("")
     }();
+    // TODO: Consider if we should extract all useful info from the chain of ancestors,
+    // to use as a bread crumb back in the template, before we lose all parent info here.
     let site: Site = data.into_site(site_id)?.into();
 
     Ok(Html(render(
