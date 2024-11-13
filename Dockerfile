@@ -1,7 +1,7 @@
 FROM rust:alpine as builder
 # Setting TZ makes "make" build the correct time (at least for local builds) into the executable
-ARG ARG_TZ=Europe/Stockholm
-ENV TZ=${ARG_TZ}
+ARG TZ=Europe/Stockholm
+ENV TZ=${TZ}
 #ENV RUSTFLAGS="-C target-cpu=native -C link-self-contained=yes"
 ENV SQLX_OFFLINE="true"
 
@@ -23,6 +23,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM alpine:latest
 LABEL maintainer="Odd E. Ebbesen <oddebb@gmail.com>"
+ARG TZ=Europe/Stockholm
+ENV TZ=${TZ}
 RUN apk add --no-cache --update \
   ca-certificates \
   tzdata \
