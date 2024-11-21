@@ -15,7 +15,7 @@ use uuid::Uuid;
 // Name your user agent after your app?
 // static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 // Pretend to be a real browser
-const APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
+static APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 pub trait RestaurantScraper {
     #[allow(async_fn_in_trait)]
@@ -105,11 +105,15 @@ async fn start_scheduler(
             let sched = JobScheduler::new().await?;
             trace!("Setting up cron job with schedule: {s}");
             sched
-                .add(Job::new(s.as_str(), move |uid, _lock| {
-                    trace!(%uid, "Notifying all scrapers to run");
-                    tx.send(ScrapeCommand::Run)
-                        .expect("Failed to send scheduled run command");
-                })?)
+                .add(Job::new_tz(
+                    s.as_str(),
+                    chrono::Local,
+                    move |uid, _lock| {
+                        trace!(%uid, "Notifying all scrapers to run");
+                        tx.send(ScrapeCommand::Run)
+                            .expect("Failed to send scheduled run command");
+                    },
+                )?)
                 .await?;
             trace!("Starting cron scheduler");
             sched.start().await?;

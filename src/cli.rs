@@ -1,12 +1,17 @@
 use anyhow::{Error, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use clap_verbosity_flag::{ErrorLevel, LevelFilter, Verbosity};
+use clap_verbosity_flag::{log::LevelFilter, ErrorLevel, Verbosity};
 use compact_str::CompactString;
 use shadow_rs::shadow;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::io;
-use tracing_subscriber::filter::LevelFilter as TFilter;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+use tracing_subscriber::{
+    filter::LevelFilter as TFilter,
+    fmt::{self, time::ChronoLocal},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter, Layer,
+};
 
 shadow!(build);
 
@@ -111,14 +116,25 @@ impl Cli {
 
     pub fn init_logger(&self) -> Result<()> {
         let layer = match self.log_format {
-            LogFormat::Json => fmt::layer().json().with_writer(io::stderr).boxed(),
-            LogFormat::Pretty => fmt::layer().pretty().with_writer(io::stderr).boxed(),
+            LogFormat::Json => fmt::layer()
+                .json()
+                .with_writer(io::stderr)
+                .with_timer(ChronoLocal::rfc_3339())
+                .boxed(),
+            LogFormat::Pretty => fmt::layer()
+                .pretty()
+                .with_writer(io::stderr)
+                .with_timer(ChronoLocal::rfc_3339())
+                .boxed(),
             LogFormat::Compact => fmt::layer()
                 .without_time()
                 .compact()
                 .with_writer(io::stderr)
                 .boxed(),
-            LogFormat::Normal => fmt::layer().with_writer(io::stderr).boxed(),
+            LogFormat::Normal => fmt::layer()
+                .with_writer(io::stderr)
+                .with_timer(ChronoLocal::rfc_3339())
+                .boxed(),
         };
         tracing_subscriber::registry()
             .with(

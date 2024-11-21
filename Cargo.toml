@@ -1,6 +1,6 @@
 [package]
 name = "rlunch"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Odd E. Ebbesen <oddebb@gmail.com>"]
@@ -15,13 +15,13 @@ bundled = []
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = [
-  "json",
-  "gzip",
   "brotli",
-  "zstd",
   "deflate",
-  "stream",
+  "gzip",
+  "json",
   "rustls-tls",
+  "stream",
+  "zstd",
 ] }
 axum = { version = "0.7" }
 axum-embed = { version = "0.1" }
@@ -46,7 +46,7 @@ tokio = { version = "1", default-features = false, features = [
 ] }
 tokio-cron-scheduler = { version = "0.13", features = ["log", "signal"] }
 clap = { version = "4.2.1", features = ["derive", "env"] }
-clap-verbosity-flag = "2.2"
+clap-verbosity-flag = "3.0"
 anyhow = "1.0"
 thiserror = { version = "2.0" }
 scraper = "0.21"
@@ -59,18 +59,20 @@ tracing = { version = "0.1", default-features = false, features = [
   "std",
 ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [
-  "env-filter",
-  "json",
-  "std",
-  "fmt",
   "ansi",
+  "chrono",
+  "env-filter",
+  "fmt",
+  "json",
+  "smallvec",
+  "std",
 ] }
 slugify = { version = "0.1" }
 rand = { version = "0.8" }
 sqlx = { version = "0.8", features = [
-  "runtime-tokio-rustls",
-  "postgres",
   "chrono",
+  "postgres",
+  "runtime-tokio-rustls",
   "uuid",
 ] }
 dotenvy = { version = "0.15" }
@@ -78,7 +80,7 @@ humantime = { version = "2.1" }
 rust_decimal = { version = "1.36", default-features = false, features = [
   "std",
 ] }
-shadow-rs = { version = "0.35" }
+shadow-rs = { version = "0.36" }
 
 # scopeguard = { version = "1.2" }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
@@ -88,7 +90,7 @@ version = "0.5"
 
 [build-dependencies]
 minijinja-embed = { version = "2.3" }
-shadow-rs = { version = "0.35" }
+shadow-rs = { version = "0.36" }
 
 # Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release
 [profile.release]
