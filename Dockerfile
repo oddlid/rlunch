@@ -7,6 +7,7 @@ ENV SQLX_OFFLINE="true"
 
 RUN apk add --no-cache --update \
   alpine-sdk \
+  git \
   musl-dev \
   tzdata \
   && rm -rf /var/cache/apk/*
