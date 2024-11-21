@@ -18,13 +18,37 @@ use minijinja_autoreload::AutoReloader;
 use rust_decimal::prelude::*;
 use rust_embed::RustEmbed;
 use serde::Serialize;
+use shadow_rs::shadow;
 use sqlx::PgPool;
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 use std::{path::PathBuf, sync::LazyLock};
 use tokio::net::TcpListener;
 use tower_http::{catch_panic::CatchPanicLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::trace;
 use uuid::Uuid;
+
+shadow!(build);
+
+#[derive(serde::Serialize)]
+struct BuildInfo<'a> {
+    build_date: Cow<'a, str>,
+    commit_date: Cow<'a, str>,
+    commit_hash: Cow<'a, str>,
+    commit_author: Cow<'a, str>,
+    pkg_version: Cow<'a, str>,
+}
+
+impl<'a> BuildInfo<'a> {
+    fn new() -> Self {
+        Self {
+            build_date: Cow::from(build::BUILD_TIME),
+            commit_date: Cow::from(build::COMMIT_DATE),
+            commit_hash: Cow::from(build::COMMIT_HASH),
+            commit_author: Cow::from(build::COMMIT_AUTHOR),
+            pkg_version: Cow::from(build::PKG_VERSION),
+        }
+    }
+}
 
 #[derive(RustEmbed, Clone)]
 #[folder = "static/"]
@@ -81,7 +105,7 @@ fn router() -> Router<ApiContext> {
         .route("/site/:site_id", get(list_dishes_for_site))
         // I found out that I had solved this in the Go version by letting the Caddy
         // frontend handle the rewrite. But it doesn't hurt to have this here as well, so I know
-        // how to du it in just Rust.
+        // how to do it in just Rust.
         .route(
             "/favicon.ico",
             get(|| async { Redirect::permanent("/static/favicon.ico") }),
@@ -112,7 +136,7 @@ async fn list_sites(ctx: State<ApiContext>) -> Result<Html<String>> {
 
     Ok(Html(render(
         "sites.html",
-        context!(gtag => &ctx.gtag, data),
+        context!(gtag => &ctx.gtag, data, build => BuildInfo::new()),
     )?))
 }
 
@@ -136,6 +160,6 @@ async fn list_dishes_for_site(
 
     Ok(Html(render(
         "dishes_for_site.html",
-        context!(gtag => &ctx.gtag, currency_suffix, site),
+        context!(gtag => &ctx.gtag, currency_suffix, site, build => BuildInfo::new()),
     )?))
 }
