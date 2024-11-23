@@ -1,60 +1,60 @@
+.bodybg {
+  background: #4f6d7a;
+}
+
+div#header {
+  background-image: url("/static/sky.jpg");
+  background-repeat: no-repeat;
+}
+
+.pghdr {
+  color: #166088;
+}
+
+div#content {
+  background-color: #fff;
+}
+
 a {
   color: #669bbc;
 }
+
 div.parsed {
   font-size: 65%;
   color: #b4881d;
-  margin-left: 1rem;
 }
-span.price {
-  float: right;
-}
+
 table.dish {
   width: 100%;
 }
+
 td.tags {
   font-size: 75%;
 }
+
 tr.dish {
   border-bottom: 1px dotted black;
 }
+
 span.site-comment {
   font-size: 75%;
 }
-ul.country-list {
+
+ul.nolist {
   list-style-type: none;
 }
-ul.city-list {
-  list-style-type: none;
-}
-ul.site-list {
-  list-style-type: none;
-}
+
 .toggledetails {
   font-size: 60%;
   cursor: pointer;
   color: #166088;
 }
-.pghdr {
-  color: #166088;
-}
-.bodybg {
-  background: #4f6d7a;
-}
+
 div.dishes {
   background: #dfe9f0;
   font-size: 90%;
 }
-div#content {
-  background-color: #fff;
-  background-image: url("/static/sky.jpg");
-  background-repeat: no-repeat;
-  background-size: 100% 8rem;
-  width: 95%;
-}
-.dlistitem {
-  margin-left: 4rem;
-}
+
 div.icon-attrib {
   font-size: 65%;
 }

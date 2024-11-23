@@ -2,17 +2,27 @@
 // the scraping framework that updates the DB
 
 use anyhow::Result;
-// use std::time::Duration;
-// use rlunch::{
-//     scrape::{get_client, RestaurantScraper},
-//     scrapers::se::gbg::majorna::MajornaScraper,
-// };
-// use uuid::Uuid;
+use rlunch::{
+    cli,
+    scrape::{get, get_client},
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let ms = MajornaScraper::new(get_client()?, Uuid::new_v4(), Duration::from_millis(1));
-    // let res = ms.run().await?;
-    // dbg!(res);
-    anyhow::bail!("Not implemented")
+    // anyhow::bail!("Not implemented")
+    // Test why fetch sometimes fail
+    cli::Cli::parse_args().init_logger()?;
+    let c = get_client()?;
+    match get(
+        &c,
+        "https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe",
+    )
+    .await
+    {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            dbg!(e);
+            Ok(())
+        }
+    }
 }

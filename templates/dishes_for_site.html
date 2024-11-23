@@ -1,57 +1,62 @@
 {% extends "layout.html" %} 
 {% block title %}Dishes for site {{ site.name }}{% endblock %} 
-{% block content %}
-{% filter indent(6, true) | safe %}
-<div class="w-100 p-3">&nbsp;</div>
+{% block header %}
+{% filter indent(8, true) | safe %}
 <h1 class="pghdr h5 text-center"><a href="/">Menu</a> @ {{ site.name }}</h1>
 <div class="toggledetails text-center mt-3" onclick="toggledetail();">[ Show / hide all ]</div>
-<div class="w-100 pb-3">&nbsp;</div>
-<div class="w-100 pb-3">&nbsp;</div>
+
+{% endfilter %}
+{% endblock %}
+{% block content %}
+{% filter indent(8, true) | safe %}
 
 {% for restaurant in site.restaurants %}
-  <div class="restaurant m-2">
-    <details open class="pb-3">
-      <summary>
-        <h2 class="name h6">
-          <a href="{{ restaurant.url }}">{{ restaurant.name }}</a>
-          {% if restaurant.address and restaurant.map_url %}
-          &nbsp;&nbsp;
-          <a href="{{ restaurant.map_url }}" target="_blank">
-            <img src="/static/map_64.png" width="24" height="24" alt="{{ restaurant.address }}" />
-          </a>
-          {% endif %}
-        </h2>
-      </summary>
-      <div class="parsed">Updated @ {{ restaurant.parsed_at | datetimeformat(format="short", tz="Europe/Stockholm") }}</div>
-      <div class="dishes ml-2 p-2 shadow rounded">
-        <table class="dish">
-          {% for dish in restaurant.dishes %}
-          <tr class="extra-info" colspan="2">
-            <td class="tags d-inline">
-              {% if dish.tags %}
-              [{{ dish.tags | join(", ")}}]
-              {% else %}
-              &nbsp;
-              {% endif %}
-              {% if dish.comment %}
-              <span class="dish-comment">({{ dish.comment }})</span>
-              {% endif %}
-            </td>
-          </tr>
-          <tr class="dish">
-            <td class="dish">
-              <div class="m-2">
-                <span class="name h6 d-inline">{{ dish.name }}</span>
-                <span class="desc d-inline">{{ dish.description }}</span>
-                <span class="price">{{ dish.price | stripz }} <span class="currency-suffix">{{ currency_suffix }}</span></span>
+
+<div class="restaurant m-2">
+  <details open class="pb-3">
+    <summary>
+      <h2 class="h6">
+        <a href="{{ restaurant.url }}">{{ restaurant.name }}</a>
+        {% if restaurant.address and restaurant.map_url %}
+        &nbsp;&nbsp;
+        <a href="{{ restaurant.map_url }}" target="_blank">
+          <img src="/static/map_64.png" width="24" height="24" alt="{{ restaurant.address }}" />
+        </a>
+        {% endif %}
+      </h2>
+    </summary>
+    <div class="parsed ms-2">Updated @ {{ restaurant.parsed_at | datetimeformat(format="short", tz="Europe/Stockholm") }}</div>
+    <div class="dishes ms-1 p-2 shadow rounded">
+      <table class="dish">
+        {% for dish in restaurant.dishes %}
+        <tr colspan="2">
+          <td class="tags">
+            {% if dish.tags %}
+            [{{ dish.tags | join(", ")}}]
+            {% else %}
+            &nbsp;
+            {% endif %}
+            {% if dish.comment %}
+            <span class="dish-comment">({{ dish.comment }})</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr class="dish">
+          <td>
+            <div class="d-flex align-items-end m-2">
+              <div class="flex-fill">
+                <span class="name h6">{{ dish.name }}</span>
+                <span class="desc">{{ dish.description }}</span>
               </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-    </details>
-  </div>
+              <div class="flex-none text-nowrap">{{ dish.price | stripz }} {{ currency_suffix }}</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </details>
+</div>
 
 {% endfor %}
 

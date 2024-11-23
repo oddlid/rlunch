@@ -53,7 +53,8 @@ enum ScrapeCommand {
 pub fn get_client() -> Result<Client> {
     Client::builder()
         .user_agent(APP_USER_AGENT)
-        .timeout(tokio::time::Duration::from_millis(1500))
+        // 1500ms turned out to sometimes be too short for lindholmen
+        .timeout(tokio::time::Duration::from_millis(5000))
         .build()
         .map_err(anyhow::Error::from)
 }
@@ -78,7 +79,7 @@ pub async fn run(
 ) -> Result<()> {
     let shutdown = crate::signals::shutdown_channel().await?;
     let (cmd_tx, _) = broadcast::channel(8); // don't know optimal buffer size yet
-    let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(100); // same here
+    let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(8); // same here
 
     // we don't use ? in calls here, since we want to first close the PgPool before returning the
     // result

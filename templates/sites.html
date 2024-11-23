@@ -1,21 +1,23 @@
 {% extends "layout.html" %} 
 {% block title %}Site list{% endblock %} 
-{% block content %}
-{% filter indent(6, true) | safe %}
-
-<div class="w-100 p-3">&nbsp;</div>
+{% block header %}
+{% filter indent(8, true) | safe %}
 <h1 class="pghdr h5 text-center">Choose site</h1>
-<div class="w-100 pb-3">&nbsp;</div>
-<div class="w-100 pb-3">&nbsp;</div>
-<ul class="country-list">
+
+{% endfilter %}
+{% endblock %}
+{% block content %}
+{% filter indent(8, true) | safe %}
+
+<ul class="nolist m-2 py-3">
 {% for country in data.countries %}
-  <li class="country-name">{{ country.name }}</li>
-  <ul class="city-list">
+  <li>{{ country.name }}</li>
+  <ul class="nolist">
   {% for city in country.cities %}
-    <li class="city-name">{{ city.name }}</li>
-    <ul class="site-list">
+    <li>{{ city.name }}</li>
+    <ul class="nolist">
     {% for site in city.sites %}
-      <li class="site-name">
+      <li>
         <a href="/site/{{ site.site_id }}">{{ site.name }}</a>
         {% if site.comment %}
         <span class="site-comment">({{ site.comment }})</span>
@@ -27,7 +29,6 @@
   </ul>
 {% endfor %}
 </ul>
-<div class="w-100 pb-3">&nbsp;</div>
 
 {% endfilter %}
 {% endblock %}

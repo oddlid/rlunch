@@ -36,13 +36,22 @@ Version:       {{ build.pkg_version }}
     <title>{% block title %}{% endblock %}</title>
   </head>
   <body class="bodybg">
-    <div id="content" class="mt-3 mx-auto rounded">
-      {% block content %}{% endblock %}
-    </div>
-    <div class="icon-attrib mt-3 mx-auto rounded text-center">
-      <a href="https://www.flaticon.com/free-icons/map" title="map icons">
-        Map icons created by Freepik - Flaticon
-      </a>
+    <div class="container">
+      <div id="header" class="py-5 rounded">
+        {% block header %}
+        <!-- Comment just to keep vim from formatting this part into one line -->
+        {% endblock %}
+      </div>
+      <div id="content" class="rounded">
+        {%- block content %}
+        <!-- Comment just to keep vim from formatting this part into one line -->
+        {% endblock %}
+      </div>
+      <div class="icon-attrib mt-3 text-center">
+        <a href="https://www.flaticon.com/free-icons/map" title="map icons">
+          Map icons created by Freepik - Flaticon
+        </a>
+      </div>
     </div>
   </body>
 </html>
