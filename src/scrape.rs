@@ -1,9 +1,12 @@
-use crate::{db, models, scrapers};
+use crate::{
+    cache,
+    cache::{Client, Opts},
+    db, models, scrapers,
+};
 use anyhow::{anyhow, Result};
 use compact_str::CompactString;
-use reqwest::{Client, IntoUrl};
+// use reqwest::{Client, IntoUrl};
 use sqlx::PgPool;
-use std::time::Duration;
 use tokio::{
     sync::{broadcast, mpsc},
     task,
@@ -15,7 +18,6 @@ use uuid::Uuid;
 // Name your user agent after your app?
 // static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 // Pretend to be a real browser
-static APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 pub trait RestaurantScraper {
     #[allow(async_fn_in_trait)]
@@ -50,49 +52,27 @@ enum ScrapeCommand {
     Shutdown,
 }
 
-pub fn get_client() -> Result<Client> {
-    Client::builder()
-        .user_agent(APP_USER_AGENT)
-        // 1500ms turned out to sometimes be too short for lindholmen
-        .timeout(tokio::time::Duration::from_millis(5000))
-        .build()
-        .map_err(anyhow::Error::from)
-}
-
-pub async fn get<U>(client: &Client, url: U) -> Result<String>
-where
-    U: IntoUrl,
-{
-    client
-        .get(url)
-        .send()
-        .await?
-        .text()
-        .await
-        .map_err(anyhow::Error::from)
-}
-
-pub async fn run(
-    pg: PgPool,
-    schedule: Option<CompactString>,
-    request_delay: Duration,
-) -> Result<()> {
+pub async fn run(pg: PgPool, schedule: Option<CompactString>, cache_opts: Opts) -> Result<()> {
     let shutdown = crate::signals::shutdown_channel().await?;
     let (cmd_tx, _) = broadcast::channel(8); // don't know optimal buffer size yet
     let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(8); // same here
 
+    let client = cache::Client::build(cache_opts).await?;
     // we don't use ? in calls here, since we want to first close the PgPool before returning the
     // result
     let res = match start_scheduler(schedule, cmd_tx.clone()).await {
-        Ok(sched) => run_loop(&pg, request_delay, sched, shutdown, cmd_tx, res_tx, res_rx).await,
+        Ok(sched) => run_loop(&pg, client.clone(), sched, shutdown, cmd_tx, res_tx, res_rx).await,
         Err(e) => {
             trace!("{}: running one-shot scrape", e);
-            run_oneshot(&pg, request_delay, shutdown, cmd_tx, res_tx, res_rx).await
+            run_oneshot(&pg, client.clone(), shutdown, cmd_tx, res_tx, res_rx).await
         }
     };
 
     // cleanup
     pg.close().await;
+    if let Err(err) = client.save().await {
+        error!(%err, "Failed to save HTTP cache");
+    }
 
     res
 }
@@ -164,13 +144,13 @@ async fn handle_result(
 
 async fn run_oneshot(
     pg: &PgPool,
-    request_delay: Duration,
+    client: Client,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
     res_tx: mpsc::Sender<Result<ScrapeResult>>,
     mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
 ) -> Result<()> {
-    let tasks = setup_scrapers(pg, request_delay, cmd_tx.clone(), res_tx).await?;
+    let tasks = setup_scrapers(pg, client.clone(), cmd_tx.clone(), res_tx).await?;
 
     trace!("Triggering scrapers once...");
     cmd_tx.send(ScrapeCommand::Run)?;
@@ -188,14 +168,14 @@ async fn run_oneshot(
 
 async fn run_loop(
     pg: &PgPool,
-    request_delay: Duration,
+    client: Client,
     mut sched: JobScheduler,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
     res_tx: mpsc::Sender<Result<ScrapeResult>>,
     mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
 ) -> Result<()> {
-    let tasks = setup_scrapers(pg, request_delay, cmd_tx.clone(), res_tx).await?;
+    let tasks = setup_scrapers(pg, client, cmd_tx.clone(), res_tx).await?;
 
     loop {
         if !handle_result(pg, &mut shutdown, &mut res_rx).await {
@@ -212,13 +192,11 @@ async fn run_loop(
 // manual add/remove scraper implementations
 async fn setup_scrapers(
     pg: &PgPool,
-    request_delay: Duration,
+    client: cache::Client,
     cmds: broadcast::Sender<ScrapeCommand>,
     results: mpsc::Sender<Result<ScrapeResult>>,
 ) -> Result<task::JoinSet<()>> {
     let mut set = task::JoinSet::new();
-
-    let client = get_client()?;
 
     set.spawn(run_scraper(
         scrapers::se::gbg::lh::LHScraper::new(
@@ -226,7 +204,6 @@ async fn setup_scrapers(
             db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "lh"))
                 .await?
                 .site_id,
-            request_delay,
         ),
         cmds.subscribe(),
         results.clone(),

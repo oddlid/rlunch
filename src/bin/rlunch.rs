@@ -1,7 +1,7 @@
 use anyhow::Result;
 use compact_str::CompactString;
 use rlunch::{
-    cli, scrape,
+    cache, cli, scrape,
     web::{api, html},
 };
 use sqlx::PgPool;
@@ -39,7 +39,24 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
         cli::Commands::Scrape {
             cron,
             request_delay,
-        } => scrape::run(pool, cron, request_delay.into()).await?,
+            request_timeout,
+            cache_ttl,
+            cache_capacity,
+            cache_path,
+        } => {
+            scrape::run(
+                pool,
+                cron,
+                cache::Opts {
+                    request_delay: request_delay.into(),
+                    request_timeout: request_timeout.into(),
+                    cache_ttl: cache_ttl.into(),
+                    cache_capacity,
+                    cache_path,
+                },
+            )
+            .await?
+        }
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(pool, listen).await?,
             cli::ServeCommands::Admin => run_server_admin(pool, listen).await?,

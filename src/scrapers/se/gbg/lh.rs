@@ -4,22 +4,22 @@
 /// to not make the code too unwieldy.
 ///
 use crate::{
+    cache::Client,
     models::{Dish, Restaurant},
-    scrape::{self, RestaurantScraper, ScrapeResult},
+    scrape::{RestaurantScraper, ScrapeResult},
     util::*,
 };
 use anyhow::{anyhow, bail, Result};
 use lazy_static::lazy_static;
-use reqwest::Client;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 use slugify::slugify;
-use std::{collections::hash_map::HashMap, time::Duration};
+use std::collections::hash_map::HashMap;
 use tracing::{error, trace};
 use url::Url;
 use uuid::Uuid;
 
 // static SCRAPE_URL: &str = "http://localhost:8080";
-const URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
+static URL_PREFIX: &str = "https://www.lindholmen.se/sv/";
 static SCRAPE_URL: &str = "https://lindholmen.uit.se/omradet/dagens-lunch?embed-mode=iframe";
 static ATTR_CLASS: &str = "class";
 static ATTR_TITLE: &str = "title";
@@ -37,12 +37,11 @@ lazy_static! {
     static ref SEL_ADDR: Selector = sel("div > h3 + p");
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LHScraper {
     client: Client,
     url: &'static str,
     site_id: Uuid,
-    request_delay: Duration,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -54,17 +53,16 @@ struct AddrInfo {
 }
 
 impl LHScraper {
-    pub fn new(client: Client, site_id: Uuid, request_delay: Duration) -> Self {
+    pub fn new(client: Client, site_id: Uuid) -> Self {
         Self {
             url: SCRAPE_URL, // TODO: evaluate if this should rather be passed in
             client,
             site_id,
-            request_delay,
         }
     }
 
     async fn get(&self, url: &str) -> Result<String> {
-        scrape::get(&self.client, url).await
+        self.client.get_as_string(url).await
     }
 
     async fn get_addr_info(&self, url: &str) -> Result<AddrInfo> {
@@ -113,7 +111,7 @@ impl LHScraper {
     ) -> HashMap<String, Restaurant> {
         for (k, v) in restaurants.iter_mut() {
             // Throttle requests to not get blocked
-            tokio::time::sleep(self.request_delay).await;
+            tokio::time::sleep(self.client.request_delay()).await;
 
             let info = self.get_addr_info(k).await;
             if info.is_err() {

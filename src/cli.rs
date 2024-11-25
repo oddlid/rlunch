@@ -1,10 +1,11 @@
+// use crate::cache::{self};
 use anyhow::{Error, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{log::LevelFilter, ErrorLevel, Verbosity};
 use compact_str::CompactString;
 use shadow_rs::shadow;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use std::io;
+use std::{io, path::PathBuf};
 use tracing_subscriber::{
     filter::LevelFilter as TFilter,
     fmt::{self, time::ChronoLocal},
@@ -50,12 +51,28 @@ pub enum Commands {
     /// Start scraper manager
     Scrape {
         /// Cron spec for running scrapers
-        #[arg(short, long)]
+        #[arg(long)]
         cron: Option<CompactString>,
 
-        /// How long to wait between requests to the same domain
-        #[arg(short, long, default_value = "1500ms")]
+        /// How long to wait between requests to the same site
+        #[arg(short = 'd', long, default_value = "1500ms")]
         request_delay: humantime::Duration,
+
+        /// How long to wait before timing out a request
+        #[arg(short = 't', long, default_value = "5s")]
+        request_timeout: humantime::Duration,
+
+        /// Time To Live for a cached request
+        #[arg(short = 'l', long, default_value = "20m")]
+        cache_ttl: humantime::Duration,
+
+        /// Max items in cache
+        #[arg(short = 'c', long, default_value_t = 64)]
+        cache_capacity: usize,
+
+        /// Path for saving cache
+        #[arg(short = 'p', long)]
+        cache_path: Option<PathBuf>,
     },
     /// Start a server
     Serve {
@@ -154,6 +171,26 @@ impl Cli {
             .await
             .map_err(Error::from)
     }
+
+    // pub fn cache_opts(&self) -> cache::Opts {
+    //     match &self.command {
+    //         Commands::Scrape {
+    //             request_delay,
+    //             request_timeout,
+    //             cache_ttl,
+    //             cache_capacity,
+    //             cache_path,
+    //             ..
+    //         } => cache::Opts {
+    //             request_delay: (*request_delay).into(),
+    //             request_timeout: (*request_timeout).into(),
+    //             cache_ttl: (*cache_ttl).into(),
+    //             cache_capacity: *cache_capacity,
+    //             cache_path: cache_path.clone(),
+    //         },
+    //         _ => cache::Opts::default(),
+    //     }
+    // }
 }
 
 // just temporary, remove later

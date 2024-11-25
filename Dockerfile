@@ -33,6 +33,5 @@ RUN apk add --no-cache --update \
   rm -rf /var/cache/apk/*
 RUN adduser -D -u 1000 lunchsrv
 COPY --from=builder --chown=lunchsrv --chmod=555 /tmp/rlunch /usr/local/bin/rlunch
-# RUN chown lunchsrv /usr/local/bin/rlunch && chmod 555 /usr/local/bin/rlunch
 USER lunchsrv
 CMD ["rlunch"]
