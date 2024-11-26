@@ -40,6 +40,8 @@ impl CacheBuilder {
     /// Try to populate the given cache with contents of the given file.
     /// If it fails to load the file, an error will be logged, and the cache will be returned
     /// unmodified.
+    /// The TTL for each cache entry will start to tick from insertion time, meaning that a very
+    /// old cache file would still give "valid" results until the TTL has expired after creation.
     async fn populate_cache<P: AsRef<Path>>(path: P, cap: usize, cache: MCache) -> MCache {
         let mut this = Self::with_capacity(cap);
         if let Err(err) = this.load(path) {
@@ -51,7 +53,7 @@ impl CacheBuilder {
             cache.insert(e.key, Arc::new(e.value)).await;
             cnt += 1;
         }
-        trace!("Loaded {} values into cache", cnt);
+        trace!("Loaded {} values from file into cache", cnt);
         cache
     }
 
@@ -70,11 +72,12 @@ impl CacheBuilder {
             });
             cnt += 1;
         }
-        trace!("Loaded {} values from cache", cnt);
+        trace!("Loaded {} values from cache, for saving to file", cnt);
 
         this
     }
 
+    /// Write whatever has been loaded in `from_cache` to the given file
     fn save<P: AsRef<Path>>(self, path: P) -> bincode::Result<()> {
         let mut f = BufWriter::new(File::create(path)?);
         let res = bincode::serialize_into(&mut f, &self.store);
@@ -82,6 +85,7 @@ impl CacheBuilder {
         res
     }
 
+    /// Used by Self::populate_cache to load file contents into a new cache
     fn load<P: AsRef<Path>>(&mut self, path: P) -> bincode::Result<()> {
         let f = BufReader::new(File::open(path)?);
         self.store = bincode::deserialize_from(f)?;
@@ -101,10 +105,11 @@ pub struct Opts {
 impl Opts {
     fn cache_mode(&self) -> CacheMode {
         if self.cache_ttl.is_zero() {
+            // Disable caching alltogether if TTL is set to 0
             return CacheMode::NoStore;
         }
-        // Using Default did not work when offline.
-        // ForceCache works offline, but I need to test more to be sure cache eviction works
+        // Using Default does not work when offline.
+        // ForceCache works offline, and seems to work fine with TTL cache eviction as well
         CacheMode::ForceCache
     }
 
@@ -132,6 +137,7 @@ pub struct Client {
 }
 
 impl Client {
+    /// Build new Client from given options
     pub async fn build(opts: Opts) -> reqwest::Result<Self> {
         // if a file path is set, try to populate the cache from the file,
         // otherwise create empty cache
@@ -159,6 +165,8 @@ impl Client {
         self.request_delay
     }
 
+    /// Consume self and write cache contents to file for later loading, if a file path was set at
+    /// build time
     pub async fn save(self) -> bincode::Result<()> {
         // try to save to file if a path is given
         match self.cache_path {
@@ -170,6 +178,8 @@ impl Client {
         }
     }
 
+    /// Wrapper to make an HTTP GET request via the inner client instance, and get the body
+    /// contents as a String
     pub async fn get_as_string<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
         self.client
             .get(url)
@@ -181,6 +191,7 @@ impl Client {
     }
 }
 
+/// Give access to the inner client via deref
 impl Deref for Client {
     type Target = ClientWithMiddleware;
 

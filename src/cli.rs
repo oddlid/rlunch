@@ -1,4 +1,3 @@
-// use crate::cache::{self};
 use anyhow::{Error, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{log::LevelFilter, ErrorLevel, Verbosity};
@@ -32,12 +31,13 @@ pub struct Cli {
     #[command(flatten)]
     pub verbosity: Verbosity<ErrorLevel>,
 
-    /// Which log formatter to use
-    // env will pick up the value if the field name is given as the key in uppercase
+    /// Which log formatter to use.
+    /// The value can also be picked up from env if the key in uppercase has a valid value.
     #[arg(short = 'f', long, env, default_value_t, value_enum)]
     pub log_format: LogFormat,
 
-    /// URL for Postgres database backend
+    /// URL for Postgres database backend.
+    /// The value can also be picked up from env if the key in uppercase has a valid value.
     #[arg(short, long, env)]
     pub database_url: String,
 
@@ -50,11 +50,13 @@ pub struct Cli {
 pub enum Commands {
     /// Start scraper manager
     Scrape {
-        /// Cron spec for running scrapers
+        /// Cron spec for running scrapers.
+        /// Leave unset to run a one-off scrape.
         #[arg(long)]
         cron: Option<CompactString>,
 
-        /// How long to wait between requests to the same site
+        /// How long to wait between requests to the same site.
+        /// Useful to not get blocked for DDoS'ing target sites.
         #[arg(short = 'd', long, default_value = "1500ms")]
         request_delay: humantime::Duration,
 
@@ -62,15 +64,22 @@ pub enum Commands {
         #[arg(short = 't', long, default_value = "5s")]
         request_timeout: humantime::Duration,
 
-        /// Time To Live for a cached request
+        /// Time To Live for a cached request.
+        /// Set to 0 to disable caching alltogether.
+        /// If set, adjust in relation to cron schedule, to get the desired behavior.
         #[arg(short = 'l', long, default_value = "20m")]
         cache_ttl: humantime::Duration,
 
-        /// Max items in cache
+        /// Max items in cache.
+        /// Adjust according to how many scrapers, and how many different page requests they make
+        /// combined.
         #[arg(short = 'c', long, default_value_t = 64)]
         cache_capacity: usize,
 
-        /// Path for saving cache
+        /// Path for saving cache between runs.
+        /// Leave unset to disable saving/loading from file.
+        /// Useful to set for local development, in order to not hammer the target scraping sites too
+        /// much.
         #[arg(short = 'p', long)]
         cache_path: Option<PathBuf>,
     },
@@ -88,12 +97,15 @@ pub enum Commands {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum ServeCommands {
+    /// Start a REST API JSON server
     Json,
+    /// Start HTML web server
     Html {
         /// Address of the backend JSON server instance
         #[arg(short, long, default_value_t = CompactString::from(""))]
         gtag: CompactString,
     },
+    /// Unimplemented
     Admin,
 }
 
@@ -131,6 +143,7 @@ impl Cli {
         }
     }
 
+    /// Initialize logging via the tracing crate
     pub fn init_logger(&self) -> Result<()> {
         let layer = match self.log_format {
             LogFormat::Json => fmt::layer()
@@ -171,33 +184,4 @@ impl Cli {
             .await
             .map_err(Error::from)
     }
-
-    // pub fn cache_opts(&self) -> cache::Opts {
-    //     match &self.command {
-    //         Commands::Scrape {
-    //             request_delay,
-    //             request_timeout,
-    //             cache_ttl,
-    //             cache_capacity,
-    //             cache_path,
-    //             ..
-    //         } => cache::Opts {
-    //             request_delay: (*request_delay).into(),
-    //             request_timeout: (*request_timeout).into(),
-    //             cache_ttl: (*cache_ttl).into(),
-    //             cache_capacity: *cache_capacity,
-    //             cache_path: cache_path.clone(),
-    //         },
-    //         _ => cache::Opts::default(),
-    //     }
-    // }
-}
-
-// just temporary, remove later
-pub fn test_tracing() {
-    tracing::trace!("Logging at level: TRACE");
-    tracing::debug!("Logging at level: DEBUG");
-    tracing::info!("Logging at level: INFO");
-    tracing::warn!("Logging at level: WARN");
-    tracing::error!("Logging at level: ERROR");
 }

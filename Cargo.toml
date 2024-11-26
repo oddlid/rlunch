@@ -28,7 +28,6 @@ moka = { version = "0.12", features = ["future"] }
 http-cache-reqwest = { version = "0.15", default-features = false, features = [
   "manager-moka",
 ] }
-hashbrown = { version = "0.15", features = ["serde"] }
 bincode = { version = "1.3" }
 axum = { version = "0.7" }
 axum-embed = { version = "0.1" }
@@ -89,6 +88,7 @@ rust_decimal = { version = "1.36", default-features = false, features = [
 ] }
 shadow-rs = { version = "0.36" }
 
+# hashbrown = { version = "0.15", features = ["serde"] }
 # scopeguard = { version = "1.2" }
 # dashmap = { version = "6.0", features = ["serde", "inline"] }
 
