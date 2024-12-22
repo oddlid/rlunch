@@ -3,12 +3,17 @@
 }
 
 div#header {
-  background-image: url("/static/sky.jpg");
+  background-image: url("/static/sky.webp");
   background-repeat: no-repeat;
 }
 
 .pghdr {
-  color: #166088;
+  font-size: 150%;
+}
+
+.pghdr,
+.pghdr > a {
+  color: #000;
 }
 
 div#content {
@@ -16,24 +21,23 @@ div#content {
 }
 
 a {
-  color: #669bbc;
+  color: #166088;
 }
 
 div.parsed {
   font-size: 65%;
-  color: #b4881d;
 }
 
-table.dish {
-  width: 100%;
-}
-
-td.tags {
+div.tags {
   font-size: 75%;
 }
 
-tr.dish {
+div.dish {
   border-bottom: 1px dotted black;
+}
+
+span.desc::after {
+  content: " - ";
 }
 
 span.site-comment {
@@ -45,7 +49,7 @@ ul.nolist {
 }
 
 .toggledetails {
-  font-size: 60%;
+  font-size: 80%;
   cursor: pointer;
   color: #166088;
 }
@@ -55,6 +59,7 @@ div.dishes {
   font-size: 90%;
 }
 
-div.icon-attrib {
+div.icon-attrib > a {
   font-size: 65%;
+  color: #fff;
 }
