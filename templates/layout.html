@@ -51,15 +51,15 @@ Version:       {{ build.pkg_version }}
         </a>
       </div>
     </div>
+    {% block gtag %}
+    <script
+      type="text/javascript"
+      src="https://www.googletagmanager.com/gtag/js?id={{ gtag }}"
+    ></script>
+    <script type="text/javascript">
+      gtag("js", new Date());
+      gtag("config", "{{ gtag }}");
+    </script>
+    {% endblock %}
   </body>
-  {% block gtag %}
-  <script
-    type="text/javascript"
-    src="https://www.googletagmanager.com/gtag/js?id={{ gtag }}"
-  ></script>
-  <script type="text/javascript">
-    gtag("js", new Date());
-    gtag("config", "{{ gtag }}");
-  </script>
-  {% endblock %}
 </html>

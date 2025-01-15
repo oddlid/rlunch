@@ -15,7 +15,10 @@ use compact_str::CompactString;
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
-use tower_http::{catch_panic::CatchPanicLayer, timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::{
+    catch_panic::CatchPanicLayer, compression::CompressionLayer, timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
 use tracing::trace;
 use uuid::Uuid;
 
@@ -40,6 +43,7 @@ fn api_router(ctx: ApiContext) -> Router {
             TraceLayer::new_for_http().on_failure(()),
             TimeoutLayer::new(Duration::from_secs(30)),
             CatchPanicLayer::new(),
+            CompressionLayer::new(),
         ))
         .with_state(ctx)
 }
@@ -48,14 +52,14 @@ fn router() -> Router<ApiContext> {
     Router::new()
         .route("/", get(|| async { Redirect::permanent("/countries/") }))
         .route("/countries/", get(list_countries))
-        .route("/cities/:country_id", get(list_cities))
-        .route("/sites/:city_id", get(list_sites))
-        .route("/restaurants/:site_id", get(list_restaurants))
+        .route("/cities/{country_id}", get(list_cities))
+        .route("/sites/{city_id}", get(list_sites))
+        .route("/restaurants/{site_id}", get(list_restaurants))
         .route(
-            "/dishes/restaurant/:restaurant_id",
+            "/dishes/restaurant/{restaurant_id}",
             get(list_dishes_for_restaurant),
         )
-        .route("/dishes/site/:site_id", get(list_dishes_for_site))
+        .route("/dishes/site/{site_id}", get(list_dishes_for_site))
         .route("/list/", get(list))
 }
 

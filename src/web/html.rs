@@ -23,7 +23,10 @@ use sqlx::PgPool;
 use std::{borrow::Cow, time::Duration};
 use std::{path::PathBuf, sync::LazyLock};
 use tokio::net::TcpListener;
-use tower_http::{catch_panic::CatchPanicLayer, timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::{
+    catch_panic::CatchPanicLayer, compression::CompressionLayer, timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
 use tracing::trace;
 use uuid::Uuid;
 
@@ -38,7 +41,7 @@ struct BuildInfo<'a> {
     pkg_version: Cow<'a, str>,
 }
 
-impl<'a> BuildInfo<'a> {
+impl BuildInfo<'_> {
     fn new() -> Self {
         Self {
             build_date: Cow::from(build::BUILD_TIME),
@@ -102,7 +105,7 @@ pub async fn serve(pg: PgPool, addr: &str, gtag: CompactString) -> anyhow::Resul
 fn router() -> Router<ApiContext> {
     Router::new()
         .route("/", get(list_sites))
-        .route("/site/:site_id", get(list_dishes_for_site))
+        .route("/site/{site_id}", get(list_dishes_for_site))
         // I found out that I had solved this in the Go version by letting the Caddy
         // frontend handle the rewrite. But it doesn't hurt to have this here as well, so I know
         // how to do it in just Rust.
@@ -120,6 +123,7 @@ fn html_router(ctx: ApiContext) -> Router {
             TraceLayer::new_for_http().on_failure(()),
             TimeoutLayer::new(Duration::from_secs(30)),
             CatchPanicLayer::new(),
+            CompressionLayer::new(),
         ))
         .with_state(ctx)
 }
