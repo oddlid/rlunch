@@ -16,6 +16,12 @@ div#header {
   color: #000;
 }
 
+.toggledetails {
+  font-size: 80%;
+  cursor: pointer;
+  color: #166088;
+}
+
 div#content {
   background-color: #fff;
 }
@@ -24,8 +30,21 @@ a {
   color: #166088;
 }
 
+ul.nolist {
+  list-style-type: none;
+}
+
+span.site-comment {
+  font-size: 75%;
+}
+
 div.parsed {
   font-size: 65%;
+}
+
+div.dishes {
+  background: #dfe9f0;
+  font-size: 90%;
 }
 
 div.tags {
@@ -34,29 +53,6 @@ div.tags {
 
 div.dish {
   border-bottom: 1px dotted black;
-}
-
-span.desc::after {
-  content: " - ";
-}
-
-span.site-comment {
-  font-size: 75%;
-}
-
-ul.nolist {
-  list-style-type: none;
-}
-
-.toggledetails {
-  font-size: 80%;
-  cursor: pointer;
-  color: #166088;
-}
-
-div.dishes {
-  background: #dfe9f0;
-  font-size: 90%;
 }
 
 div.icon-attrib > a {

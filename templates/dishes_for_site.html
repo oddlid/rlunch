@@ -12,16 +12,15 @@
 
 {% for restaurant in site.restaurants %}
 
-<div class="restaurant p-2">
-  <details open class="">
-    <summary>
+<div class="p-2">
+  <details open>
+    <summary class="mx-1 my-3">
       {% if restaurant.address and restaurant.map_url %}
-      <a href="{{ restaurant.map_url }}" target="_blank">
+      <a href="{{ restaurant.map_url }}" target="_blank" class="px-2 py-1">
         <img src="/static/map_64.webp" width="28" height="28" alt="{{ restaurant.address }}" />
       </a>
-      &nbsp;&nbsp;
       {% endif %}
-      <a href="{{ restaurant.url }}">{{ restaurant.name }}</a>
+      <a href="{{ restaurant.url }}" target="_blank" class="px-2 py-1">{{ restaurant.name }}</a>
     </summary>
     <div class="parsed">Updated @ {{ restaurant.parsed_at | datetimeformat(format="short", tz="Europe/Stockholm") }}</div>
     <div class="dishes shadow rounded p-2">
@@ -33,13 +32,15 @@
         &nbsp;
         {% endif %}
         {% if dish.comment %}
-        <span class="dish-comment">({{ dish.comment }})</span>
+        <span>({{ dish.comment }})</span>
         {% endif %}
       </div>
-      <div class="dish">
-        <span class="name fw-medium">{{ dish.name }}</span>
-        <span class="desc">{{ dish.description }}</span>
-        <span class="price fw-medium text-decoration-underline text-nowrap">{{ dish.price | stripz }} {{ currency_suffix }}</span>
+      <div class="d-flex dish">
+        <div class="overflow-auto">
+          <span class="fw-medium">{{ dish.name }}</span>
+          <span>{{ dish.description }}</span>
+        </div>
+        <div class="ms-auto ps-1 fw-medium text-decoration-underline text-nowrap">{{ dish.price | stripz }} {{ currency_suffix }}</div>
       </div>
     {% endfor %}
     </div>
