@@ -63,7 +63,7 @@ thiserror = { version = "2.0" }
 scraper = "0.22"
 lazy_static = "1.5"
 compact_str = { version = "0.8", features = ["serde", "markup"] }
-nom = { version = "7.1" }
+nom = { version = "8.0" }
 log = { version = "0.4" }
 tracing = { version = "0.1", default-features = false, features = [
   "attributes",
@@ -79,7 +79,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
   "std",
 ] }
 slugify = { version = "0.1" }
-rand = { version = "0.8" }
+rand = { version = "0.9" }
 sqlx = { version = "0.8", features = [
   "chrono",
   "postgres",
@@ -91,7 +91,7 @@ humantime = { version = "2.1" }
 rust_decimal = { version = "1.36", default-features = false, features = [
   "std",
 ] }
-shadow-rs = { version = "0.37" }
+shadow-rs = { version = "1.0" }
 
 # hashbrown = { version = "0.15", features = ["serde"] }
 # scopeguard = { version = "1.2" }
@@ -102,7 +102,7 @@ version = "0.5"
 
 [build-dependencies]
 minijinja-embed = { version = "2.3" }
-shadow-rs = { version = "0.37" }
+shadow-rs = { version = "1.0" }
 
 # Compile with: RUSTFLAGS="-C target-cpu=native" cargo build --release
 [profile.release]
