@@ -91,11 +91,11 @@ static LOADER: LazyLock<AutoReloader> = LazyLock::new(|| {
     })
 });
 
-pub async fn serve(pg: PgPool, addr: &str, gtag: CompactString) -> anyhow::Result<()> {
+pub async fn serve(pg: PgPool, addr: &str) -> anyhow::Result<()> {
     trace!(addr, "Starting HTTP server...");
     axum::serve(
         TcpListener::bind(addr).await?,
-        html_router(ApiContext { db: pg, gtag }),
+        html_router(ApiContext { db: pg }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await
@@ -140,7 +140,7 @@ async fn list_sites(ctx: State<ApiContext>) -> Result<Html<String>> {
 
     Ok(Html(render(
         "sites.html",
-        context!(gtag => &ctx.gtag, data, build => BuildInfo::new()),
+        context!(data, build => BuildInfo::new()),
     )?))
 }
 
@@ -164,6 +164,6 @@ async fn list_dishes_for_site(
 
     Ok(Html(render(
         "dishes_for_site.html",
-        context!(gtag => &ctx.gtag, currency_suffix, site, build => BuildInfo::new()),
+        context!(currency_suffix, site, build => BuildInfo::new()),
     )?))
 }

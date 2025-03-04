@@ -3,7 +3,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use compact_str::CompactString;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::PgPool;
@@ -16,7 +15,6 @@ pub mod html;
 #[derive(Debug, Clone)]
 pub struct ApiContext {
     pub db: PgPool,
-    pub gtag: CompactString,
 }
 
 impl ApiContext {

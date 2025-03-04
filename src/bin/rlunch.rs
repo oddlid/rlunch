@@ -60,7 +60,7 @@ async fn dispatch_commands(c: cli::Cli) -> Result<()> {
         cli::Commands::Serve { listen, commands } => match commands {
             cli::ServeCommands::Json => run_server_json(pool, listen).await?,
             cli::ServeCommands::Admin => run_server_admin(pool, listen).await?,
-            cli::ServeCommands::Html { gtag } => run_server_html(pool, listen, gtag).await?,
+            cli::ServeCommands::Html => run_server_html(pool, listen).await?,
         },
     }
     Ok(())
@@ -79,6 +79,6 @@ async fn run_server_admin(_pg: PgPool, addr: CompactString) -> Result<()> {
 }
 
 // #[tracing::instrument]
-async fn run_server_html(pg: PgPool, addr: CompactString, gtag: CompactString) -> Result<()> {
-    html::serve(pg, &addr, gtag).await
+async fn run_server_html(pg: PgPool, addr: CompactString) -> Result<()> {
+    html::serve(pg, &addr).await
 }

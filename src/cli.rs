@@ -100,11 +100,7 @@ pub enum ServeCommands {
     /// Start a REST API JSON server
     Json,
     /// Start HTML web server
-    Html {
-        /// Address of the backend JSON server instance
-        #[arg(short, long, default_value_t = CompactString::from(""))]
-        gtag: CompactString,
-    },
+    Html,
     /// Unimplemented
     Admin,
 }

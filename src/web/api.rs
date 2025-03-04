@@ -11,7 +11,6 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use compact_str::CompactString;
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
@@ -26,10 +25,7 @@ pub async fn serve(pg: PgPool, addr: &str) -> anyhow::Result<()> {
     trace!(addr, "Starting HTTP API server...");
     axum::serve(
         TcpListener::bind(addr).await?,
-        api_router(ApiContext {
-            db: pg,
-            gtag: CompactString::from(""),
-        }),
+        api_router(ApiContext { db: pg }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await
