@@ -1,3 +1,4 @@
+use anyhow::Result;
 use http_cache_reqwest::{
     Cache, CacheMode, HttpCache, HttpCacheOptions, MokaCache, MokaCacheBuilder, MokaManager,
 };
@@ -15,7 +16,7 @@ use std::{
 };
 use tracing::{debug, error, trace};
 
-static APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+static APP_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
 type MCache = MokaCache<String, Arc<Vec<u8>>, RandomState>;
 
@@ -78,17 +79,17 @@ impl CacheBuilder {
     }
 
     /// Write whatever has been loaded in `from_cache` to the given file
-    fn save<P: AsRef<Path>>(self, path: P) -> bincode::Result<()> {
+    fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
         let mut f = BufWriter::new(File::create(path)?);
-        let res = bincode::serialize_into(&mut f, &self.store);
+        bincode::serde::encode_into_std_write(&self.store, &mut f, bincode::config::standard())?;
         f.flush()?;
-        res
+        Ok(())
     }
 
     /// Used by Self::populate_cache to load file contents into a new cache
-    fn load<P: AsRef<Path>>(&mut self, path: P) -> bincode::Result<()> {
-        let f = BufReader::new(File::open(path)?);
-        self.store = bincode::deserialize_from(f)?;
+    fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let mut f = BufReader::new(File::open(path)?);
+        self.store = bincode::serde::decode_from_std_read(&mut f, bincode::config::standard())?;
         Ok(())
     }
 }
@@ -167,7 +168,7 @@ impl Client {
 
     /// Consume self and write cache contents to file for later loading, if a file path was set at
     /// build time
-    pub async fn save(self) -> bincode::Result<()> {
+    pub async fn save(self) -> Result<()> {
         // try to save to file if a path is given
         match self.cache_path {
             Some(p) => CacheBuilder::from_cache(self.cache).await.save(p),
@@ -180,7 +181,7 @@ impl Client {
 
     /// Wrapper to make an HTTP GET request via the inner client instance, and get the body
     /// contents as a String
-    pub async fn get_as_string<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
+    pub async fn get_as_string<U: IntoUrl>(&self, url: U) -> Result<String> {
         self.client
             .get(url)
             .send()
