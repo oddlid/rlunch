@@ -55,7 +55,7 @@ tokio = { version = "1", default-features = false, features = [
   "sync",
   "time",
 ] }
-tokio-cron-scheduler = { version = "0.13", features = ["log", "signal"] }
+tokio-cron-scheduler = { version = "0.14", features = ["log", "signal"] }
 clap = { version = "4.2.1", features = ["derive", "env"] }
 clap-verbosity-flag = "3.0"
 anyhow = "1.0"
