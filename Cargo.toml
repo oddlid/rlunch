@@ -60,7 +60,7 @@ clap = { version = "4.2.1", features = ["derive", "env"] }
 clap-verbosity-flag = "3.0"
 anyhow = "1.0"
 thiserror = { version = "2.0" }
-scraper = "0.23"
+scraper = "0.24"
 lazy_static = "1.5"
 compact_str = { version = "0.9", features = ["serde", "markup"] }
 nom = { version = "8.0" }
