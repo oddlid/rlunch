@@ -21,6 +21,12 @@
       </a>
       {% endif %}
       <a href="{{ restaurant.url }}" target="_blank" class="px-2 py-1">{{ restaurant.name }}</a>
+      {% if restaurant.address %}
+        {{ restaurant.address }}
+      {% endif %}
+      {% if restaurant.comment %}
+        ( {{ restaurant.comment }} )
+      {% endif %}
     </summary>
     <div class="parsed">Updated @ {{ restaurant.parsed_at | datetimeformat(format="short", tz="Europe/Stockholm") }}</div>
     <div class="dishes shadow rounded p-2">
