@@ -1,4 +1,4 @@
-FROM rust:alpine as builder
+FROM rust:alpine AS builder
 # Setting TZ makes "make" build the correct time (at least for local builds) into the executable
 ARG TZ=Europe/Stockholm
 ENV TZ=${TZ}
