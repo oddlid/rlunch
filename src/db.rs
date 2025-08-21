@@ -13,8 +13,8 @@
 // If anyone ever reads this and have an idea of how to do this, I'd be happy to hear it!
 
 use crate::{
-    models::{City, Country, Dish, LunchData, Restaurant, RestaurantRows, Site},
-    scrape::ScrapeResult,
+    models::{City, Country, Dish, DishRows, LunchData, Restaurant, Site},
+    scrape::SiteScrapeResult,
 };
 use anyhow::Result;
 use sqlx::{Error, Executor, PgPool, Postgres};
@@ -477,60 +477,115 @@ pub async fn list_dishes_for_site_by_key(
 // LunchData instance, but that might be a bad idea if the DB gets big.
 // Let's wait and see of there's any need for it at some point.
 
-pub async fn update_site(pg: &PgPool, update: ScrapeResult) -> Result<(), Error> {
-    trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
+// Keeping this for reference, due to the quirky queries
+// pub async fn update_site(pg: &PgPool, update: SiteScrapeResult) -> Result<(), Error> {
+//     trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
+//
+//     let start = Instant::now();
+//     // convert to format suitable for use with unnest
+//     let rs = RestaurantRows::from(update.restaurants);
+//     let duration = start.elapsed();
+//     trace!("Conversion to DB format done in {:?}", duration);
+//
+//     // we need a transaction to ensure these operations are done atomically
+//     let mut tx = pg.begin().await?;
+//
+//     let start = Instant::now();
+//     // first, clear out all restaurants and their dishes, so that we don't have any stale data
+//     // lingering. We have "on delete cascade" for dishes, so we just need to delete the parent
+//     // restaurants to get rid of all.
+//     sqlx::query!("delete from restaurant where site_id = $1", update.site_id)
+//         .execute(&mut *tx)
+//         .await?;
+//
+//     // insert all restaurants
+//     sqlx::query!(
+//         r#"
+//             insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at)
+//             select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::timestamptz[])
+//         "#,
+//         &rs.site_ids[..],
+//         &rs.restaurant_ids[..],
+//         &rs.names[..],
+//         &rs.comments as &[Option<String>],
+//         &rs.addresses as &[Option<String>],
+//         &rs.urls as &[Option<String>],
+//         &rs.map_urls as &[Option<String>],
+//         &rs.parsed_ats[..],
+//     )
+//     .execute(&mut *tx)
+//     .await?;
+//
+//     // insert all dishes
+//     sqlx::query!(
+//         r#"
+//             insert into dish (restaurant_id, dish_id, dish_name, description, comment, price, tags)
+//             select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[], $7::text[])
+//         "#,
+//         &rs.dishes.restaurant_ids[..],
+//         &rs.dishes.dish_ids[..],
+//         &rs.dishes.names[..],
+//         &rs.dishes.descriptions as &[Option<String>],
+//         &rs.dishes.comments as &[Option<String>],
+//         &rs.dishes.prices[..],
+//         &rs.dishes.tags[..],
+//     ).execute(&mut *tx).await?;
+//     let duration = start.elapsed();
+//
+//     trace!("DB update done in {:?}", duration);
+//
+//     tx.commit().await
+// }
 
-    let start = Instant::now();
-    // convert to format suitable for use with unnest
-    let rs = RestaurantRows::from(update.restaurants);
-    let duration = start.elapsed();
-    trace!("Conversion to DB format done in {:?}", duration);
+// Add/replace one restaurant at a time, to allow for leaving manually inserted restaurants
+// untouched, and not needing to scrape stuff that rarely changes
+pub async fn update_restaurants(pg: &PgPool, update: SiteScrapeResult) -> Result<(), Error> {
+    trace!(site_id = %update.site_id, "Adding {} restaurants and {} dishes to DB", update.num_restaurants(), update.num_dishes());
 
     // we need a transaction to ensure these operations are done atomically
     let mut tx = pg.begin().await?;
 
     let start = Instant::now();
-    // first, clear out all restaurants and their dishes, so that we don't have any stale data
-    // lingering. We have "on delete cascade" for dishes, so we just need to delete the parent
-    // restaurants to get rid of all.
-    sqlx::query!("delete from restaurant where site_id = $1", update.site_id)
+
+    for restaurant in update.restaurants.into_iter() {
+        sqlx::query!(
+            "delete from restaurant where site_id = $1 and restaurant_name = $2",
+            restaurant.site_id,
+            restaurant.name
+        )
         .execute(&mut *tx)
         .await?;
 
-    // insert all restaurants
-    sqlx::query!(
-        r#"
-            insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at)
-            select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::timestamptz[])
-        "#,
-        &rs.site_ids[..],
-        &rs.restaurant_ids[..],
-        &rs.names[..],
-        &rs.comments as &[Option<String>],
-        &rs.addresses as &[Option<String>],
-        &rs.urls as &[Option<String>],
-        &rs.map_urls as &[Option<String>],
-        &rs.parsed_ats[..],
-    )
-    .execute(&mut *tx)
-    .await?;
+        sqlx::query!(
+        "insert into restaurant (site_id, restaurant_id, restaurant_name, comment, address, url, map_url, created_at) values($1, $2, $3, $4, $5, $6, $7, $8)",
+        restaurant.site_id,
+        restaurant.restaurant_id,
+        restaurant.name,
+        restaurant.comment,
+        restaurant.address,
+        restaurant.url,
+        restaurant.map_url,
+        restaurant.parsed_at,
+    ).execute(&mut *tx).await?;
 
-    // insert all dishes
-    sqlx::query!(
+        let drs = DishRows::from(restaurant.dishes);
+        // insert all dishes
+        sqlx::query!(
         r#"
             insert into dish (restaurant_id, dish_id, dish_name, description, comment, price, tags)
             select * from unnest($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::real[], $7::text[])
         "#,
-        &rs.dishes.restaurant_ids[..],
-        &rs.dishes.dish_ids[..],
-        &rs.dishes.names[..],
-        &rs.dishes.descriptions as &[Option<String>],
-        &rs.dishes.comments as &[Option<String>],
-        &rs.dishes.prices[..],
-        &rs.dishes.tags[..],
+        &drs.restaurant_ids[..],
+        &drs.dish_ids[..],
+        &drs.names[..],
+        &drs.descriptions as &[Option<String>],
+        &drs.comments as &[Option<String>],
+        &drs.prices[..],
+        &drs.tags[..],
     ).execute(&mut *tx).await?;
-    let duration = start.elapsed();
+    }
 
+    let duration = start.elapsed();
     trace!("DB update done in {:?}", duration);
 
     tx.commit().await

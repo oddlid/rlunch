@@ -15,9 +15,9 @@
 <div class="p-2">
   <details open>
     <summary class="mx-1 my-3">
-      {% if restaurant.address and restaurant.map_url %}
+      {% if restaurant.map_url %}
       <a href="{{ restaurant.map_url }}" target="_blank" class="px-2 py-1">
-        <img src="/static/map_64.webp" width="28" height="28" alt="{{ restaurant.address }}" />
+        <img src="/static/map_64.webp" width="28" height="28" alt="{{ restaurant.map_url }}" />
       </a>
       {% endif %}
       <a href="{{ restaurant.url }}" target="_blank" class="px-2 py-1">{{ restaurant.name }}</a>

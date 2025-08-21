@@ -1,9 +1,10 @@
 use crate::{
-    cache,
-    cache::{Client, Opts},
-    db, models, scrapers,
+    cache::{self, Client, Opts},
+    db,
+    models::{self},
+    scrapers,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use compact_str::CompactString;
 // use reqwest::{Client, IntoUrl};
 use sqlx::PgPool;
@@ -17,22 +18,21 @@ use uuid::Uuid;
 
 // Name your user agent after your app?
 // static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
-// Pretend to be a real browser
 
-pub trait RestaurantScraper {
+pub trait SiteScraper {
     #[allow(async_fn_in_trait)]
-    async fn run(&self) -> Result<ScrapeResult>;
+    async fn run(&self) -> Result<SiteScrapeResult>;
 
     fn name(&self) -> &'static str;
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ScrapeResult {
+pub struct SiteScrapeResult {
     pub site_id: Uuid,
     pub restaurants: Vec<models::Restaurant>,
 }
 
-impl ScrapeResult {
+impl SiteScrapeResult {
     pub fn num_restaurants(&self) -> usize {
         self.restaurants.len()
     }
@@ -46,6 +46,11 @@ impl ScrapeResult {
     }
 }
 
+// pub trait RestaurantScraper {
+//     #[allow(async_fn_in_trait)]
+//     async fn run(&self) -> Result<Restaurant>;
+// }
+
 #[derive(Debug, Clone)]
 enum ScrapeCommand {
     Run,
@@ -55,7 +60,7 @@ enum ScrapeCommand {
 pub async fn run(pg: PgPool, schedule: Option<CompactString>, cache_opts: Opts) -> Result<()> {
     let shutdown = crate::signals::shutdown_channel().await?;
     let (cmd_tx, _) = broadcast::channel(8); // don't know optimal buffer size yet
-    let (res_tx, res_rx) = mpsc::channel::<Result<ScrapeResult>>(8); // same here
+    let (res_tx, res_rx) = mpsc::channel::<Result<SiteScrapeResult>>(8); // same here
 
     let client = cache::Client::build(cache_opts).await?;
     // we don't use ? in calls here, since we want to first close the PgPool before returning the
@@ -109,7 +114,7 @@ async fn start_scheduler(
 async fn handle_result(
     pg: &PgPool,
     shutdown: &mut broadcast::Receiver<()>,
-    res_rx: &mut mpsc::Receiver<Result<ScrapeResult>>,
+    res_rx: &mut mpsc::Receiver<Result<SiteScrapeResult>>,
 ) -> bool {
     tokio::select! {
         _ = shutdown.recv() => {
@@ -120,13 +125,22 @@ async fn handle_result(
         res = res_rx.recv() => match res {
             Some(v) => match v {
                 Ok(v) => {
-                    // we need to copy the id, since update_site will consume v
-                    let site_id = v.site_id;
-                    debug!(%site_id, "Got scrape result, updating DB...");
-                    if let Err(e) = db::update_site(pg, v).await {
-                        error!(err = %e, "Failed to update DB");
+                    #[cfg(not(feature = "debug-scrapers"))]
+                    {
+                        // we need to copy the id, since update_restaurant will consume v
+                        let site_id = v.site_id;
+                        debug!(%site_id, "Got scrape result, updating DB...");
+                        if let Err(e) = db::update_restaurants(pg, v).await {
+                            error!(err = %e, "Failed to update DB");
+                        }
+                        debug!(%site_id, "DB update OK");
                     }
-                    debug!(%site_id, "DB update OK");
+
+                    #[cfg(feature = "debug-scrapers")]
+                    {
+                        debug!(%v.site_id, "Got scrape result, dumping results...");
+                        println!("{:#?}", v);
+                    }
                 },
                 Err(e) => {
                     error!(err = %e, "Scraping failed");
@@ -147,8 +161,8 @@ async fn run_oneshot(
     client: Client,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
-    res_tx: mpsc::Sender<Result<ScrapeResult>>,
-    mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
+    res_tx: mpsc::Sender<Result<SiteScrapeResult>>,
+    mut res_rx: mpsc::Receiver<Result<SiteScrapeResult>>,
 ) -> Result<()> {
     let tasks = setup_scrapers(pg, client.clone(), cmd_tx.clone(), res_tx).await?;
 
@@ -172,8 +186,8 @@ async fn run_loop(
     mut sched: JobScheduler,
     mut shutdown: broadcast::Receiver<()>,
     cmd_tx: broadcast::Sender<ScrapeCommand>,
-    res_tx: mpsc::Sender<Result<ScrapeResult>>,
-    mut res_rx: mpsc::Receiver<Result<ScrapeResult>>,
+    res_tx: mpsc::Sender<Result<SiteScrapeResult>>,
+    mut res_rx: mpsc::Receiver<Result<SiteScrapeResult>>,
 ) -> Result<()> {
     let tasks = setup_scrapers(pg, client, cmd_tx.clone(), res_tx).await?;
 
@@ -194,12 +208,12 @@ async fn setup_scrapers(
     pg: &PgPool,
     client: cache::Client,
     cmds: broadcast::Sender<ScrapeCommand>,
-    results: mpsc::Sender<Result<ScrapeResult>>,
+    results: mpsc::Sender<Result<SiteScrapeResult>>,
 ) -> Result<task::JoinSet<()>> {
     let mut set = task::JoinSet::new();
 
     set.spawn(run_scraper(
-        scrapers::se::gbg::lh::LHScraper::new(
+        scrapers::se::gbg::lh::fawenah::LHScraper::new(
             client.clone(),
             db::get_site_relation(pg, db::SiteKey::new("se", "gbg", "lh"))
                 .await?
@@ -242,9 +256,9 @@ async fn stop_scrapers(
 }
 
 async fn run_scraper(
-    scraper: impl RestaurantScraper,
+    scraper: impl SiteScraper,
     mut cmds: broadcast::Receiver<ScrapeCommand>,
-    results: mpsc::Sender<Result<ScrapeResult>>,
+    results: mpsc::Sender<Result<SiteScrapeResult>>,
 ) {
     let name = scraper.name();
     loop {

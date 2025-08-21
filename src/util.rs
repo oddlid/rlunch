@@ -1,5 +1,16 @@
+use chrono::{Datelike, Local, Weekday};
 use nom::number::complete;
 use scraper::{ElementRef, Selector};
+
+const WEEKDAYS: [&str; 7] = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+];
 
 pub fn sel(selector: &str) -> Selector {
     Selector::parse(selector).unwrap()
@@ -21,6 +32,19 @@ pub fn parse_float(s: &str) -> f32 {
 
 pub fn reduce_whitespace(s: &str) -> String {
     s.split_whitespace().collect::<Vec<&str>>().join(" ")
+}
+
+pub fn get_weekday() -> Weekday {
+    Local::now().date_naive().weekday()
+}
+// Util function to get lowercased current weekday name in english
+pub fn get_current_weekday_name() -> &'static str {
+    get_weekday_name(get_weekday())
+}
+
+// Util function to get lowercased weekday name in english
+pub fn get_weekday_name(wd: Weekday) -> &'static str {
+    WEEKDAYS[wd as usize]
 }
 
 // we need to have this split into a separate function, so that thread_rng is dropped before the

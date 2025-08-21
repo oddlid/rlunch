@@ -2,6 +2,7 @@
 // while the structs in the api sub-module are stripped versions of those intended for use in API
 // output, and similar, where uuids and mappings are not needed.
 
+use crate::util;
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
@@ -19,9 +20,21 @@ pub trait Id {
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, sqlx::FromRow)]
 pub struct UuidMap<T>(pub HashMap<Uuid, T>);
 
-impl<T: Id, U: std::convert::From<T>> From<Vec<T>> for UuidMap<U> {
+impl<T: Id, U: From<T>> From<Vec<T>> for UuidMap<U> {
     fn from(value: Vec<T>) -> Self {
         Self(value.into_iter().map(|v| (v.id(), v.into())).collect())
+    }
+}
+
+impl From<UuidMap<Restaurant>> for HashMap<String, Restaurant> {
+    fn from(mut value: UuidMap<Restaurant>) -> Self {
+        value.drain().map(|(_, v)| (v.name.clone(), v)).collect()
+    }
+}
+
+impl From<HashMap<String, Restaurant>> for UuidMap<Restaurant> {
+    fn from(mut value: HashMap<String, Restaurant>) -> Self {
+        Self(value.drain().map(|(_, v)| (v.id(), v)).collect())
     }
 }
 
@@ -40,7 +53,7 @@ impl<T> DerefMut for UuidMap<T> {
 }
 
 impl<T: Id> UuidMap<T> {
-    pub fn into_vec<U: std::convert::From<T>>(mut self) -> Vec<U> {
+    pub fn into_vec<U: From<T>>(mut self) -> Vec<U> {
         self.drain().map(|(_, v)| v.into()).collect()
     }
 
@@ -93,6 +106,27 @@ impl Dish {
 impl Id for Dish {
     fn id(&self) -> Uuid {
         self.dish_id
+    }
+}
+
+impl From<fawenah::MenuItem> for Dish {
+    fn from(item: fawenah::MenuItem) -> Self {
+        let mut s = Self {
+            dish_id: Uuid::new_v4(),
+            name: item.name,
+            tags: item.tags,
+            ..Default::default()
+        };
+        if !item.category.is_empty() {
+            s.comment = Some(item.category);
+        }
+        if !item.description.is_empty() {
+            s.description = Some(item.description);
+        }
+        if !item.price.is_empty() {
+            s.price = util::parse_float(&item.price);
+        }
+        s
     }
 }
 
@@ -220,6 +254,13 @@ impl Restaurant {
 
     pub fn set_dishes(&mut self, dishes: Vec<Dish>) {
         self.dishes = dishes.into()
+    }
+
+    pub fn with_id(self, restaurant_id: Uuid) -> Self {
+        Self {
+            restaurant_id,
+            ..self
+        }
     }
 
     pub fn with_dish(mut self, dish: Dish) -> Self {
@@ -571,6 +612,77 @@ impl LunchData {
             }
         }
         Err(anyhow::format_err!("site_id {site_id} not found"))
+    }
+}
+
+pub mod fawenah {
+    use serde::{Deserialize, Serialize};
+    use std::{
+        collections::hash_map::HashMap,
+        ops::{Deref, DerefMut},
+    };
+
+    #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+    #[serde(default)]
+    pub struct RestaurantLink {
+        pub url: String,
+        pub map: String,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+    #[serde(default)]
+    pub struct MenuItem {
+        pub name: String,
+        pub category: String,
+        pub description: String,
+        pub price: String,
+        pub tags: Vec<String>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+    #[serde(default)]
+    pub struct DayMenu {
+        pub day: String,
+        pub items: Vec<MenuItem>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+    #[serde(default)]
+    pub struct DayMenus(pub HashMap<String, DayMenu>);
+
+    impl Deref for DayMenus {
+        type Target = HashMap<String, DayMenu>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for DayMenus {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    impl DayMenus {
+        pub fn add(&mut self, k: String, v: DayMenu) -> Option<DayMenu> {
+            self.insert(k, v)
+        }
+
+        pub fn strip_key_suffix(mut self, suffix: &str) -> Self {
+            let mut s = Self {
+                ..Default::default()
+            };
+
+            for (k, v) in self.drain() {
+                if let Some(k) = k.strip_suffix(suffix) {
+                    s.add(k.into(), v);
+                } else {
+                    s.add(k, v);
+                }
+            }
+            s
+        }
     }
 }
 
