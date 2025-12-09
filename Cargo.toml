@@ -1,6 +1,6 @@
 [package]
 name = "rlunch"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["Odd E. Ebbesen <oddebb@gmail.com>"]
@@ -61,7 +61,7 @@ clap = { version = "4.2.1", features = ["derive", "env"] }
 clap-verbosity-flag = "3.0"
 anyhow = "1.0"
 thiserror = { version = "2.0" }
-scraper = "0.24"
+scraper = "0.25"
 lazy_static = "1.5"
 compact_str = { version = "0.9", features = ["serde", "markup"] }
 nom = { version = "8.0" }
