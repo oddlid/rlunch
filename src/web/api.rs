@@ -1,4 +1,4 @@
-use super::{check_id, ApiContext, ListQuery, ListQueryLevel, Result};
+use super::{ApiContext, ListQuery, ListQueryLevel, Result, check_id};
 use crate::{
     db::{self, SiteKey},
     models::api::LunchData,
@@ -6,11 +6,12 @@ use crate::{
 };
 use anyhow::Context;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     response::Redirect,
     routing::get,
-    Json, Router,
 };
+use reqwest::StatusCode;
 use sqlx::PgPool;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
@@ -37,7 +38,7 @@ fn api_router(ctx: ApiContext) -> Router {
         .merge(router())
         .layer((
             TraceLayer::new_for_http().on_failure(()),
-            TimeoutLayer::new(Duration::from_secs(30)),
+            TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)),
             CatchPanicLayer::new(),
             CompressionLayer::new(),
         ))

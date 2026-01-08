@@ -4,7 +4,7 @@ volumes:
 
 services:
   db:
-    image: postgres:alpine
+    image: dhi.io/postgres:17-alpine3.22
     container_name: pg
     hostname: pg
     restart: unless-stopped
@@ -22,7 +22,7 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
 
   rlunch_html:
-    image: oddlid/rlunch:latest
+    image: oddlid/rlunch:0.2.6
     build: .
     container_name: rlunch_html
     command: rlunch serve -l 0.0.0.0:8081 html

@@ -6,15 +6,16 @@ use crate::{
 };
 use anyhow::Context;
 use axum::{
+    Router,
     extract::{Path, State},
     response::{Html, Redirect},
     routing::get,
-    Router,
 };
 use axum_embed::ServeEmbed;
 use compact_str::CompactString;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use minijinja_autoreload::AutoReloader;
+use reqwest::StatusCode;
 use rust_decimal::prelude::*;
 use rust_embed::RustEmbed;
 use serde::Serialize;
@@ -121,7 +122,7 @@ fn html_router(ctx: ApiContext) -> Router {
         .merge(router())
         .layer((
             TraceLayer::new_for_http().on_failure(()),
-            TimeoutLayer::new(Duration::from_secs(30)),
+            TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)),
             CatchPanicLayer::new(),
             CompressionLayer::new(),
         ))
