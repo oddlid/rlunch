@@ -11,3 +11,4 @@ target
 flake.*
 migrations
 scratch.sql
+build_docker.sh
