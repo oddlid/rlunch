@@ -1,3 +1,13 @@
-tmp/
-target/
+tmp
+target
 .DS_Store
+.direnv
+.env
+.envrc
+.git
+.gitignore
+.docker-compose.yml
+*.md
+flake.*
+migrations
+scratch.sql

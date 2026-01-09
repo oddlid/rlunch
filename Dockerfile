@@ -19,11 +19,22 @@ RUN \
   --mount=type=cache,target=/build/target/ \
   --mount=type=cache,target=/usr/local/cargo/git/db \
   --mount=type=cache,target=/usr/local/cargo/registry/ \
-  sfw cargo build --features=bundled --locked --release && \
-  cp /build/target/release/rlunch /build/rlunch
+  sfw cargo build --features=bundled --locked --release \
+  && cp /build/target/release/rlunch /build/rlunch
 
-FROM dhi.io/alpine-base:3.23
-LABEL maintainer="Odd E. Ebbesen <oddebb@gmail.com>"
+FROM scratch
 
-COPY --from=builder --chmod=555 /build/rlunch /usr/local/bin/rlunch
-CMD ["rlunch"]
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+COPY --from=builder --chmod=555 /build/rlunch /rlunch
+ENTRYPOINT ["/rlunch"]
+CMD ["--help"]
+
+ARG AUTHORS="Odd E. Ebbesen <oddebb@gmail.com>"
+ARG VERSION="0.2.6"
+ARG BUILD_DATE="unknown"
+ARG VCS_REF="unknown"
+LABEL \
+  org.opencontainers.image.version="${VERSION}" \
+  org.opencontainers.image.created="${BUILD_DATE}" \
+  org.opencontainers.image.revision="${VCS_REF}" \
+  org.opencontainers.image.authors="${AUTHORS}}"
