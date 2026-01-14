@@ -25,7 +25,7 @@ services:
     image: oddlid/rlunch:0.2.6
     build: .
     container_name: rlunch_html
-    command: rlunch serve -l 0.0.0.0:8081 html
+    command: serve -l 0.0.0.0:8081 html
     ports:
       - "8081:8081/tcp"
     environment:

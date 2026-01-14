@@ -30,7 +30,7 @@ ENTRYPOINT ["/rlunch"]
 CMD ["--help"]
 
 ARG AUTHORS="Odd E. Ebbesen <oddebb@gmail.com>"
-ARG VERSION="0.2.6"
+ARG VERSION="unknown"
 ARG BUILD_DATE="unknown"
 ARG VCS_REF="unknown"
 LABEL \
